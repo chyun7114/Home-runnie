@@ -10,44 +10,40 @@
   "panels": [
     {
       "type": "timeseries",
-      "title": "Handshake / Join / Message p95 (ms)",
+      "title": "WS Session p95/p99 (ms)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(ws_handshake_duration_ms_bucket[1m])) by (le))",
-          "legendFormat": "handshake p95"
+          "expr": "((histogram_quantile(0.95, sum(rate(ws_session_duration_ms_bucket[1m])) by (le))) unless (sum(rate(ws_session_duration_ms_count[1m])) == 0)) or on() vector(0)",
+          "legendFormat": "session p95"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(ws_join_room_duration_ms_bucket[1m])) by (le))",
-          "legendFormat": "join p95"
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(ws_message_process_duration_ms_bucket[1m])) by (le))",
-          "legendFormat": "message p95"
+          "expr": "((histogram_quantile(0.99, sum(rate(ws_session_duration_ms_bucket[1m])) by (le))) unless (sum(rate(ws_session_duration_ms_count[1m])) == 0)) or on() vector(0)",
+          "legendFormat": "session p99"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
     },
     {
       "type": "timeseries",
-      "title": "DB Query p95 by type (ms)",
+      "title": "Broker Publish by route/result (/s)",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(db_query_duration_ms_bucket[1m])) by (query_type, le))",
-          "legendFormat": "{{query_type}}"
+          "expr": "sum(rate(ws_broker_publish_total[1m])) by (route, result)",
+          "legendFormat": "{{route}} / {{result}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
     },
     {
       "type": "timeseries",
-      "title": "Failures by reason (/s)",
+      "title": "V2 Message result by reason (/s)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
         {
-          "expr": "sum(rate(ws_failure_total[1m])) by (reason)",
-          "legendFormat": "{{reason}}"
+          "expr": "sum(rate(ws_v2_message_result_total[1m])) by (result, reason)",
+          "legendFormat": "{{result}} / {{reason}}"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
@@ -57,9 +53,9 @@
       "title": "Connected sockets / Active rooms / Pending messages",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
-        { "expr": "ws_connected_sockets", "legendFormat": "connected sockets" },
-        { "expr": "ws_active_rooms", "legendFormat": "active rooms" },
-        { "expr": "ws_pending_message_jobs", "legendFormat": "pending msg jobs" }
+        { "expr": "sum(ws_connected_sockets)", "legendFormat": "connected sockets" },
+        { "expr": "sum(ws_active_rooms)", "legendFormat": "active rooms" },
+        { "expr": "sum(ws_pending_message_jobs)", "legendFormat": "pending msg jobs" }
       ],
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
     },
@@ -67,7 +63,7 @@
       "type": "timeseries",
       "title": "Event loop lag (ms)",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
-      "targets": [{ "expr": "node_event_loop_lag_ms", "legendFormat": "event loop lag" }],
+      "targets": [{ "expr": "avg(node_event_loop_lag_ms)", "legendFormat": "event loop lag (avg)" }],
       "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
     }
   ],

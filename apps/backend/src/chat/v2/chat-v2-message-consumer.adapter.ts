@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { connect } from 'amqplib';
 import { ChatV2MessagePersistenceService } from '@/chat/v2/chat-v2-message-persistence.service';
@@ -40,6 +40,7 @@ type ConnectionLike = {
 };
 
 type ConnectFn = (url: string) => Promise<ConnectionLike>;
+export const AMQP_CONNECT_FN = Symbol('AMQP_CONNECT_FN');
 
 @Injectable()
 export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestroy {
@@ -52,6 +53,7 @@ export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestr
   private readonly routingKey: string;
   private readonly dlqRoutingKey: string;
   private readonly maxRetries: number;
+  private readonly consumerEnabled: boolean;
   private readonly connectFn: ConnectFn;
 
   private connection: ConnectionLike | null = null;
@@ -60,7 +62,7 @@ export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestr
   constructor(
     configService: ConfigService,
     private readonly persistenceService: ChatV2MessagePersistenceService,
-    connectFn?: ConnectFn,
+    @Optional() @Inject(AMQP_CONNECT_FN) connectFn?: ConnectFn,
   ) {
     this.useExternalBrokers =
       configService.get<string>('CHAT_USE_EXTERNAL_BROKERS', 'false') === 'true';
@@ -74,11 +76,13 @@ export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestr
     this.routingKey = 'chat.v2.message.received';
     this.dlqRoutingKey = `${this.routingKey}.dlq`;
     this.maxRetries = Number(configService.get<string>('RABBITMQ_V2_CONSUMER_MAX_RETRIES', '3'));
+    this.consumerEnabled =
+      configService.get<string>('CHAT_V2_CONSUMER_ENABLED', 'true') === 'true';
     this.connectFn = connectFn ?? ((url: string) => connect(url) as Promise<ConnectionLike>);
   }
 
   async onModuleInit(): Promise<void> {
-    if (!this.useExternalBrokers) {
+    if (!this.useExternalBrokers || !this.consumerEnabled) {
       return;
     }
 

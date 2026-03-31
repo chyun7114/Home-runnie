@@ -6,6 +6,7 @@ services:
     container_name: homerunnie-nginx
     volumes:
       - ./infra/loadtest/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/loadtest/nginx/logs:/var/log/nginx
     ports:
       - "3030:80"
     depends_on:

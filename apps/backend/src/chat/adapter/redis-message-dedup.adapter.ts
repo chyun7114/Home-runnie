@@ -11,7 +11,9 @@ export class RedisMessageDedupAdapter implements MessageDedupPort, OnModuleInit,
   private redis: Redis | null = null;
 
   constructor(configService: ConfigService) {
-    this.redisUrl = configService.get<string>('REDIS_URL', 'redis://localhost:6379');
+    const redisHost = configService.get<string>('REDIS_HOST', 'localhost');
+    const redisPort = configService.get<string>('REDIS_PORT', '6379');
+    this.redisUrl = configService.get<string>('REDIS_URL', `redis://${redisHost}:${redisPort}`);
     this.keyTtlSeconds = Number(
       configService.get<string>('CHAT_V2_MESSAGE_ID_TTL_SECONDS', '3600'),
     );

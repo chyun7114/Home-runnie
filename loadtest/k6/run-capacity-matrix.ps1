@@ -4,7 +4,8 @@ param(
   [int]$MaxVUs = 500,
   [string]$Warmup = "20s",
   [string]$Ramp = "40s",
-  [string]$Sustain = "60s"
+  [string]$Sustain = "60s",
+  [string]$ScriptPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +15,12 @@ $resultRoot = Join-Path $PSScriptRoot "results"
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $runDir = Join-Path $resultRoot $stamp
 New-Item -ItemType Directory -Force $runDir | Out-Null
+
+if ([string]::IsNullOrWhiteSpace($ScriptPath)) {
+  $ScriptPath = "$PSScriptRoot\\ws-chat.js"
+} elseif (-not [System.IO.Path]::IsPathRooted($ScriptPath)) {
+  $ScriptPath = Join-Path $PSScriptRoot $ScriptPath
+}
 
 $profiles = @(
   @{ Name = "sla8"; AuthTimeout = 8000 },
@@ -25,6 +32,15 @@ $rows = @()
 function Get-MetricValue($metric, $preferred, $fallback = 0) {
   if ($null -eq $metric) { return $fallback }
   if ($metric.PSObject.Properties.Name -contains $preferred) { return [double]$metric.$preferred }
+  return $fallback
+}
+
+function Get-MetricValueFromKeys($metrics, $keys, $preferred, $fallback = 0) {
+  foreach ($k in $keys) {
+    if ($metrics.PSObject.Properties.Name -contains $k) {
+      return Get-MetricValue $metrics.$k $preferred $fallback
+    }
+  }
   return $fallback
 }
 
@@ -48,7 +64,7 @@ foreach ($profile in $profiles) {
 
     $proc = Start-Process `
       -FilePath "k6" `
-      -ArgumentList @("run", "--summary-export", $summaryFile, "$PSScriptRoot\\ws-chat.js") `
+      -ArgumentList @("run", "--summary-export", $summaryFile, $ScriptPath) `
       -NoNewWindow `
       -Wait `
       -PassThru `
@@ -65,12 +81,12 @@ foreach ($profile in $profiles) {
     $row = [PSCustomObject]@{
       profile                       = $profile.Name
       rate_target                   = $rate
-      auth_success                  = Get-MetricValue $metrics.ws_auth_success_rate "value" 0
-      join_success                  = Get-MetricValue $metrics.ws_join_success_rate "value" 0
-      msg_roundtrip_success         = Get-MetricValue $metrics.ws_message_roundtrip_success_rate "value" 0
-      p95_ms                        = Get-MetricValue $metrics.ws_message_roundtrip_ms "p(95)" 0
-      p99_ms                        = Get-MetricValue $metrics.ws_message_roundtrip_ms "p(99)" 0
-      ws_error_count                = Get-MetricValue $metrics.ws_error_count "count" 0
+      auth_success                  = Get-MetricValueFromKeys $metrics @("ws_auth_success_rate", "v2_ws_connect_success_rate") "value" 0
+      join_success                  = Get-MetricValueFromKeys $metrics @("ws_join_success_rate", "v2_ws_ready_success_rate") "value" 0
+      msg_roundtrip_success         = Get-MetricValueFromKeys $metrics @("ws_message_roundtrip_success_rate", "v2_ws_message_success_rate") "value" 0
+      p95_ms                        = Get-MetricValueFromKeys $metrics @("ws_message_roundtrip_ms", "v2_ws_message_roundtrip_ms") "p(95)" 0
+      p99_ms                        = Get-MetricValueFromKeys $metrics @("ws_message_roundtrip_ms", "v2_ws_message_roundtrip_ms") "p(99)" 0
+      ws_error_count                = Get-MetricValueFromKeys $metrics @("ws_error_count", "v2_ws_error_count") "count" 0
       dropped_iterations            = Get-MetricValue $metrics.dropped_iterations "count" 0
       max_active_vus                = Get-MetricValue $metrics.vus "max" 0
       iterations                    = Get-MetricValue $metrics.iterations "count" 0
@@ -99,3 +115,4 @@ Write-Host "[matrix] Done"
 Write-Host " - runDir: $runDir"
 Write-Host " - csv:    $csvPath"
 Write-Host " - md:     $mdPath"
+Write-Host " - script: $ScriptPath"

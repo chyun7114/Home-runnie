@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { connect } from 'amqplib';
 
@@ -38,6 +38,7 @@ type ConnectionLike = {
 };
 
 type ConnectFn = (url: string) => Promise<ConnectionLike>;
+export const AMQP_DLX_CONNECT_FN = Symbol('AMQP_DLX_CONNECT_FN');
 
 @Injectable()
 export class ChatV2MessageDlqReprocessorAdapter implements OnModuleInit, OnModuleDestroy {
@@ -51,12 +52,16 @@ export class ChatV2MessageDlqReprocessorAdapter implements OnModuleInit, OnModul
   private readonly dlqRoutingKey: string;
   private readonly parkingRoutingKey: string;
   private readonly maxDlqRetries: number;
+  private readonly reprocessEnabled: boolean;
   private readonly connectFn: ConnectFn;
 
   private connection: ConnectionLike | null = null;
   private channel: ChannelLike | null = null;
 
-  constructor(configService: ConfigService, connectFn?: ConnectFn) {
+  constructor(
+    configService: ConfigService,
+    @Optional() @Inject(AMQP_DLX_CONNECT_FN) connectFn?: ConnectFn,
+  ) {
     this.useExternalBrokers =
       configService.get<string>('CHAT_USE_EXTERNAL_BROKERS', 'false') === 'true';
     this.amqpUrl = configService.get<string>('RABBITMQ_URL', 'amqp://localhost:5672');
@@ -72,11 +77,13 @@ export class ChatV2MessageDlqReprocessorAdapter implements OnModuleInit, OnModul
     this.maxDlqRetries = Number(
       configService.get<string>('RABBITMQ_V2_DLQ_REPROCESS_MAX_RETRIES', '2'),
     );
+    this.reprocessEnabled =
+      configService.get<string>('CHAT_V2_DLQ_REPROCESS_ENABLED', 'true') === 'true';
     this.connectFn = connectFn ?? ((url: string) => connect(url) as Promise<ConnectionLike>);
   }
 
   async onModuleInit(): Promise<void> {
-    if (!this.useExternalBrokers) {
+    if (!this.useExternalBrokers || !this.reprocessEnabled) {
       return;
     }
 
