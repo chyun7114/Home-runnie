@@ -6,6 +6,7 @@ import { WsJwtGuard } from '@/chat/ws-jwt.guard';
 import { ChatService } from '@/chat/service';
 import { ChatRepository } from '@/chat/repository';
 import { ChatController } from '@/chat/controller';
+import { ChatV2Controller, ChatV2GatewayAdapter } from '@/chat/v2';
 import { DbModule } from '@/common/db/db.module';
 import { MemberModule } from '@/member/member.module';
 
@@ -21,8 +22,8 @@ import { MemberModule } from '@/member/member.module';
     }),
     MemberModule,
   ],
-  controllers: [ChatController],
-  providers: [ChatGateway, WsJwtGuard, ChatService, ChatRepository],
+  controllers: [ChatController, ChatV2Controller],
+  providers: [ChatGateway, ChatV2GatewayAdapter, WsJwtGuard, ChatService, ChatRepository],
   exports: [ChatService],
 })
 export class ChatModule {}
