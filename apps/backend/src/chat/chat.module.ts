@@ -7,16 +7,14 @@ import { ChatService } from '@/chat/service';
 import { ChatRepository } from '@/chat/repository';
 import { ChatController } from '@/chat/controller';
 import { ChatV2Controller, ChatV2GatewayAdapter } from '@/chat/v2';
-import {
-  ChatGatewayRoomEventAdapter,
-  NoopEventPublisherAdapter,
-  NoopMessageBusAdapter,
-  RabbitMqEventPublisherAdapter,
-  RedisMessageBusAdapter,
-} from '@/chat/adapter';
+import { ChatGatewayRoomEventAdapter } from '@/chat/adapter';
 import { DbModule } from '@/common/db/db.module';
 import { MemberModule } from '@/member/member.module';
 import { EVENT_PUBLISHER_PORT, MESSAGE_BUS_PORT, ROOM_EVENT_PORT } from '@/chat/application/port';
+import {
+  createEventPublisherAdapter,
+  createMessageBusAdapter,
+} from '@/chat/infra/broker-provider.factory';
 
 @Module({
   imports: [
@@ -45,24 +43,12 @@ import { EVENT_PUBLISHER_PORT, MESSAGE_BUS_PORT, ROOM_EVENT_PORT } from '@/chat/
     {
       provide: MESSAGE_BUS_PORT,
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const useExternalBrokers = configService.get<string>('CHAT_USE_EXTERNAL_BROKERS', 'false');
-        if (useExternalBrokers === 'true') {
-          return new RedisMessageBusAdapter(configService);
-        }
-        return new NoopMessageBusAdapter();
-      },
+      useFactory: createMessageBusAdapter,
     },
     {
       provide: EVENT_PUBLISHER_PORT,
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const useExternalBrokers = configService.get<string>('CHAT_USE_EXTERNAL_BROKERS', 'false');
-        if (useExternalBrokers === 'true') {
-          return new RabbitMqEventPublisherAdapter(configService);
-        }
-        return new NoopEventPublisherAdapter();
-      },
+      useFactory: createEventPublisherAdapter,
     },
   ],
   exports: [ChatService],
