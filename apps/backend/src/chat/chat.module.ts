@@ -7,8 +7,10 @@ import { ChatService } from '@/chat/service';
 import { ChatRepository } from '@/chat/repository';
 import { ChatController } from '@/chat/controller';
 import { ChatV2Controller, ChatV2GatewayAdapter } from '@/chat/v2';
+import { ChatGatewayRoomEventAdapter } from '@/chat/adapter';
 import { DbModule } from '@/common/db/db.module';
 import { MemberModule } from '@/member/member.module';
+import { ROOM_EVENT_PORT } from '@/chat/application/port';
 
 @Module({
   imports: [
@@ -23,7 +25,18 @@ import { MemberModule } from '@/member/member.module';
     MemberModule,
   ],
   controllers: [ChatController, ChatV2Controller],
-  providers: [ChatGateway, ChatV2GatewayAdapter, WsJwtGuard, ChatService, ChatRepository],
+  providers: [
+    ChatGateway,
+    ChatV2GatewayAdapter,
+    ChatGatewayRoomEventAdapter,
+    WsJwtGuard,
+    ChatService,
+    ChatRepository,
+    {
+      provide: ROOM_EVENT_PORT,
+      useExisting: ChatGatewayRoomEventAdapter,
+    },
+  ],
   exports: [ChatService],
 })
 export class ChatModule {}
