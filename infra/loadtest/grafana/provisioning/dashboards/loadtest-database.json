@@ -1,0 +1,74 @@
+{
+  "id": null,
+  "uid": "lt-db",
+  "title": "Loadtest - Database",
+  "tags": ["loadtest", "database", "postgres"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "DB Connections",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(pg_stat_database_numbackends{datname=\"jikgwan\"})",
+          "legendFormat": "connections"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Transactions / sec",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(pg_stat_database_xact_commit{datname=\"jikgwan\"}[1m]))",
+          "legendFormat": "commit/s"
+        },
+        {
+          "expr": "sum(rate(pg_stat_database_xact_rollback{datname=\"jikgwan\"}[1m]))",
+          "legendFormat": "rollback/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tuples inserted / updated / deleted",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(pg_stat_database_tup_inserted{datname=\"jikgwan\"}[1m]))",
+          "legendFormat": "insert/s"
+        },
+        {
+          "expr": "sum(rate(pg_stat_database_tup_updated{datname=\"jikgwan\"}[1m]))",
+          "legendFormat": "update/s"
+        },
+        {
+          "expr": "sum(rate(pg_stat_database_tup_deleted{datname=\"jikgwan\"}[1m]))",
+          "legendFormat": "delete/s"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache Hit Ratio %",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(pg_stat_database_blks_hit{datname=\"jikgwan\"}[1m])) / clamp_min(sum(rate(pg_stat_database_blks_hit{datname=\"jikgwan\"}[1m])) + sum(rate(pg_stat_database_blks_read{datname=\"jikgwan\"}[1m])), 1)",
+          "legendFormat": "hit ratio"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] }
+    }
+  ],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" }
+}

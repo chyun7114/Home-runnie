@@ -6,8 +6,26 @@ import { WsJwtGuard } from '@/chat/ws-jwt.guard';
 import { ChatService } from '@/chat/service';
 import { ChatRepository } from '@/chat/repository';
 import { ChatController } from '@/chat/controller';
+import { ChatV2Controller, ChatV2GatewayAdapter } from '@/chat/v2';
+import { ChatGatewayRoomEventAdapter } from '@/chat/adapter';
 import { DbModule } from '@/common/db/db.module';
 import { MemberModule } from '@/member/member.module';
+import {
+  EVENT_PUBLISHER_PORT,
+  MESSAGE_BUS_PORT,
+  MESSAGE_DEDUP_PORT,
+  ROOM_EVENT_PORT,
+} from '@/chat/application/port';
+import {
+  createEventPublisherAdapter,
+  createMessageDedupAdapter,
+  createMessageBusAdapter,
+} from '@/chat/infra/broker-provider.factory';
+import {
+  ChatV2MessageConsumerAdapter,
+  ChatV2MessageDlqReprocessorAdapter,
+  ChatV2MessagePersistenceService,
+} from '@/chat/v2';
 
 @Module({
   imports: [
@@ -21,8 +39,37 @@ import { MemberModule } from '@/member/member.module';
     }),
     MemberModule,
   ],
-  controllers: [ChatController],
-  providers: [ChatGateway, WsJwtGuard, ChatService, ChatRepository],
+  controllers: [ChatController, ChatV2Controller],
+  providers: [
+    ChatGateway,
+    ChatV2GatewayAdapter,
+    ChatV2MessageConsumerAdapter,
+    ChatV2MessageDlqReprocessorAdapter,
+    ChatV2MessagePersistenceService,
+    ChatGatewayRoomEventAdapter,
+    WsJwtGuard,
+    ChatService,
+    ChatRepository,
+    {
+      provide: ROOM_EVENT_PORT,
+      useExisting: ChatGatewayRoomEventAdapter,
+    },
+    {
+      provide: MESSAGE_BUS_PORT,
+      inject: [ConfigService],
+      useFactory: createMessageBusAdapter,
+    },
+    {
+      provide: EVENT_PUBLISHER_PORT,
+      inject: [ConfigService],
+      useFactory: createEventPublisherAdapter,
+    },
+    {
+      provide: MESSAGE_DEDUP_PORT,
+      inject: [ConfigService],
+      useFactory: createMessageDedupAdapter,
+    },
+  ],
   exports: [ChatService],
 })
 export class ChatModule {}

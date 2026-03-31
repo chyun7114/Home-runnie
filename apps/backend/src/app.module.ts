@@ -17,6 +17,7 @@ import { CommentModule } from '@/comment/comment.module';
 import { HealthModule } from '@/health/health.module';
 import databaseConfig from '@/common/config/database.config';
 import * as path from 'path';
+import { MetricsModule } from '@/metrics';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import * as path from 'path';
     ChatModule,
     CommentModule,
     HealthModule,
+    MetricsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

@@ -1,6 +1,8 @@
+# syntax=docker/dockerfile:1.7
 FROM node:22-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+ENV PNPM_STORE_DIR="/pnpm/store"
 RUN corepack enable
 
 # 1. 의존성 격리 스테이지 (deps)
@@ -24,12 +26,14 @@ WORKDIR /app
 COPY .gitignore .gitignore
 COPY --from=builder /app/out/json/ .
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=homerunnie-pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prefer-offline
 
 # 의존성이 확보된 후 진짜 소스코드를 덮어씌워서 빌드 실행
 COPY --from=builder /app/out/full/ .
 COPY turbo.json turbo.json
-RUN pnpm turbo run build --filter=@homerunnie/backend...
+RUN --mount=type=cache,id=homerunnie-turbo-cache,target=/root/.cache/turbo \
+    pnpm turbo run build --filter=@homerunnie/backend...
 
 # 불필요한 개발용 패키지를 모두 제거하고 프로덕션 코어를 `/app/pruned` 폴더에 분리 보관
 RUN pnpm --filter=@homerunnie/backend --prod deploy /app/pruned --legacy

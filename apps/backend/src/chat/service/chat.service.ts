@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { ChatRepository } from '@/chat/repository';
-import { ChatGateway } from '@/chat/chat.gateway';
+import { ROOM_EVENT_PORT, RoomEventPort } from '@/chat/application/port';
 import {
   ChatRoomResponseDto,
   GetChatRoomsResponseDto,
@@ -27,7 +27,7 @@ export class ChatService {
   constructor(
     @Inject() private readonly chatRepository: ChatRepository,
     @Inject(DATABASE_CONNECTION) private readonly db: DbType,
-    private readonly chatGateway: ChatGateway,
+    @Inject(ROOM_EVENT_PORT) private readonly roomEventPort: RoomEventPort,
   ) {}
 
   async createChatRoom(postId: number, memberId: number): Promise<ChatRoomResponseDto> {
@@ -109,7 +109,7 @@ export class ChatService {
 
       const request = await this.chatRepository.resetJoinRequestToPending(chatRoomId, memberId);
 
-      this.chatGateway.emitJoinRequestReceived(String(chatRoomId), {
+      this.roomEventPort.emitJoinRequestReceived(String(chatRoomId), {
         requestId: request.id,
         memberId,
         chatRoomId,
@@ -120,7 +120,7 @@ export class ChatService {
 
     const request = await this.chatRepository.createJoinRequest(chatRoomId, memberId);
 
-    this.chatGateway.emitJoinRequestReceived(String(chatRoomId), {
+    this.roomEventPort.emitJoinRequestReceived(String(chatRoomId), {
       requestId: request.id,
       memberId,
       chatRoomId,
@@ -182,11 +182,11 @@ export class ChatService {
     const systemMessage = '[SYSTEM]새로운 멤버가 참여했습니다.';
     await this.chatRepository.saveMessage(request.chatRoomId, request.memberId, systemMessage);
 
-    this.chatGateway.emitMemberJoined(String(request.chatRoomId), {
+    this.roomEventPort.emitMemberJoined(String(request.chatRoomId), {
       memberId: request.memberId,
     });
 
-    this.chatGateway.emitToRoom(String(request.chatRoomId), 'received_message', {
+    this.roomEventPort.emitToRoom(String(request.chatRoomId), 'received_message', {
       nickname: '',
       message: systemMessage,
       isOwn: false,
@@ -216,7 +216,7 @@ export class ChatService {
       throw new BadRequestException('이미 처리된 요청입니다.');
     }
 
-    this.chatGateway.emitJoinRequestRejected(String(request.chatRoomId), {
+    this.roomEventPort.emitJoinRequestRejected(String(request.chatRoomId), {
       memberId: request.memberId,
     });
 
@@ -237,7 +237,7 @@ export class ChatService {
 
     await this.chatRepository.softDeleteChatRoomMember(chatRoomId, targetMemberId);
 
-    this.chatGateway.emitMemberKicked(String(chatRoomId), {
+    this.roomEventPort.emitMemberKicked(String(chatRoomId), {
       memberId: targetMemberId,
     });
 
@@ -247,7 +247,7 @@ export class ChatService {
   async deleteChatRoom(chatRoomId: number, hostId: number) {
     await this.verifyHost(chatRoomId, hostId);
 
-    this.chatGateway.emitRoomDeleted(String(chatRoomId));
+    this.roomEventPort.emitRoomDeleted(String(chatRoomId));
 
     await this.chatRepository.softDeleteChatRoom(chatRoomId);
     return { chatRoomId };

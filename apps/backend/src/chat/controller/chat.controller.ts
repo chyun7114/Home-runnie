@@ -14,6 +14,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { ChatService } from '@/chat/service';
 import { CurrentMember } from '@/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { CHAT_ROUTES } from '@/common/versioning/api-version.constants';
 import { CreateChatRoomRequestDto, GetChatRoomsRequestDto } from '@/chat/dto/request';
 import {
   ChatRoomResponseDto,
@@ -24,7 +25,7 @@ import {
 import { CreateChatRoomSwagger, GetChatRoomsSwagger } from '@/chat/swagger';
 
 @ApiTags('채팅방')
-@Controller('chat')
+@Controller(CHAT_ROUTES.V1_HTTP_BASE_PATH)
 @UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}

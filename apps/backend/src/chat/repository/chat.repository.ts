@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, and, desc, count, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, count, gt, sql } from 'drizzle-orm';
 import { DATABASE_CONNECTION } from '@/common';
 import { ChatRoom, ChatRoomMember, ChatMessage, ChatJoinRequest } from '@/chat/domain';
 import { ChatRoomMemberRole, ChatJoinRequestStatus } from '@homerunnie/shared';
@@ -206,6 +206,20 @@ export class ChatRepository {
     return messages.reverse();
   }
 
+  async findMessagesAfterId(chatRoomId: number, lastMessageId: number, limit = 100) {
+    return this.db
+      .select({
+        id: ChatMessage.id,
+        content: ChatMessage.content,
+        senderId: ChatMessage.senderId,
+        createdAt: ChatMessage.createdAt,
+      })
+      .from(ChatMessage)
+      .where(and(eq(ChatMessage.chatRoomId, chatRoomId), gt(ChatMessage.id, lastMessageId)))
+      .orderBy(asc(ChatMessage.id))
+      .limit(limit);
+  }
+
   async findChatRoomMember(chatRoomId: number, memberId: number, tx?: DbTransaction) {
     const executor = tx || this.db;
     const [member] = await executor
@@ -234,6 +248,16 @@ export class ChatRepository {
       .where(and(eq(ChatRoomMember.chatRoomId, chatRoomId), eq(ChatRoomMember.deleted, false)));
 
     return members;
+  }
+
+  async findAnyMemberIdByChatRoom(chatRoomId: number): Promise<number | null> {
+    const [member] = await this.db
+      .select({ memberId: ChatRoomMember.memberId })
+      .from(ChatRoomMember)
+      .where(and(eq(ChatRoomMember.chatRoomId, chatRoomId), eq(ChatRoomMember.deleted, false)))
+      .limit(1);
+
+    return member?.memberId ?? null;
   }
 
   async softDeleteChatRoomMember(chatRoomId: number, memberId: number) {

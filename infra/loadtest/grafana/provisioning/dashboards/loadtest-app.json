@@ -1,0 +1,76 @@
+{
+  "id": null,
+  "uid": "lt-app",
+  "title": "Loadtest - App(WebSocket)",
+  "tags": ["loadtest", "app", "websocket"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Handshake / Join / Message p95 (ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(ws_handshake_duration_ms_bucket[1m])) by (le))",
+          "legendFormat": "handshake p95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(ws_join_room_duration_ms_bucket[1m])) by (le))",
+          "legendFormat": "join p95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(ws_message_process_duration_ms_bucket[1m])) by (le))",
+          "legendFormat": "message p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Query p95 by type (ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(db_query_duration_ms_bucket[1m])) by (query_type, le))",
+          "legendFormat": "{{query_type}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Failures by reason (/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(ws_failure_total[1m])) by (reason)",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Connected sockets / Active rooms / Pending messages",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "ws_connected_sockets", "legendFormat": "connected sockets" },
+        { "expr": "ws_active_rooms", "legendFormat": "active rooms" },
+        { "expr": "ws_pending_message_jobs", "legendFormat": "pending msg jobs" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "type": "timeseries",
+      "title": "Event loop lag (ms)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [{ "expr": "node_event_loop_lag_ms", "legendFormat": "event loop lag" }],
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] }
+    }
+  ],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" }
+}
