@@ -18,10 +18,11 @@ import { ChatRepository } from '@/chat/repository';
 import { JwtPayload } from '@/auth/types';
 import { WsJwtGuard, WsSocketUser, WsUser, extractTokenFromSocket } from '@/chat/ws-jwt.guard';
 import { MetricsService } from '@/metrics';
+import { CHAT_WS_NAMESPACES } from '@/common/versioning/api-version.constants';
 
 @Injectable()
 @WebSocketGateway({
-  namespace: 'chat',
+  namespace: CHAT_WS_NAMESPACES.V1,
   cors: {
     origin: (process.env.CORS_ORIGINS || 'http://localhost:3000,https://www.homerunnie.app').split(
       ',',
