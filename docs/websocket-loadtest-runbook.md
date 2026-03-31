@@ -75,6 +75,24 @@ docker stats --no-stream
 3. Sustain 5분: `30 user/s`
 4. 성공률/지연/리소스를 기록한다.
 
+### 5-1-1. k6 실행 절차 (기본 플로우)
+1. `loadtest/.env.k6` 파일에 테스트 값을 입력한다.
+   - 샘플: `loadtest/.env.k6.example`
+2. 표준 실행 명령으로 실행한다. (`.env.k6`는 스크립트에서 자동 로드)
+
+```bash
+k6 run loadtest/k6/ws-chat.js
+```
+
+3. 일시적으로 값만 덮어쓰고 싶으면 `-e`를 사용한다.
+
+```bash
+k6 run -e ROOM_ID=2 loadtest/k6/ws-chat.js
+```
+
+4. 다중 토큰을 사용할 경우 `ACCESS_TOKENS`를 사용한다.
+   - 예: `token1,token2,token3`
+
 ### 5-2. 시나리오 B (장기 연결)
 1. 동시 접속 목표치를 고정한다. (예: 300, 500)
 2. 각 연결은 2~5분 유지한다.
@@ -98,6 +116,13 @@ docker stats --no-stream
 - `join_room` 성공률
 - `message` 전송 후 `received_message` 수신률
 - 강제 disconnect 비율
+- k6 커스텀 메트릭
+  - `ws_connect_success_rate`
+  - `ws_auth_success_rate`
+  - `ws_join_success_rate`
+  - `ws_message_roundtrip_success_rate`
+  - `ws_message_roundtrip_ms`
+  - `ws_session_success_rate`
 
 ### 인프라 레벨
 - CPU 평균/피크
@@ -114,6 +139,14 @@ docker stats --no-stream
    - 에러율 `> 2%` 1분 이상
    - `p99 > 3s` 3분 이상
    - 메모리 `> 95%` 지속
+
+## 7-1. k6 기본 임계치(스크립트 내 반영)
+- `ws_connect_success_rate > 0.99`
+- `ws_auth_success_rate > 0.99`
+- `ws_join_success_rate > 0.99`
+- `ws_message_roundtrip_success_rate > 0.99`
+- `ws_message_roundtrip_ms p(95) < 800ms`
+- `ws_message_roundtrip_ms p(99) < 1500ms`
 
 ## 8. 결과 기록 템플릿
 1. 테스트 ID: `YYYYMMDD-A/B/C/D-01`

@@ -6,7 +6,7 @@ import { Warn } from '@/admin/domain';
 import { Post, RecruitmentDetail } from '@/post/domain';
 import { Scrap } from '@/scrap/domain';
 import { Participation } from '@/participation/domain';
-import { ChatRoom, ChatRoomMember, ChatMessage } from '@/chat/domain';
+import { ChatRoom, ChatRoomMember, ChatMessage, ChatJoinRequest } from '@/chat/domain';
 import {
   OAuthProvider,
   RecruitmentRoleEnum,
@@ -83,6 +83,7 @@ export async function seeding() {
   console.log('🧹 Clearing existing data...');
   await db.delete(ChatMessage);
   await db.delete(ChatRoomMember);
+  await db.delete(ChatJoinRequest);
   await db.delete(ChatRoom);
   await db.delete(Participation);
   await db.delete(Scrap);

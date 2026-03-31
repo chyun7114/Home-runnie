@@ -21,6 +21,9 @@
 - 부하테스트 도구는 `k6`로 고정
 - 모니터링 스택은 `Prometheus + Grafana` 조합으로 고정
 - 결과 보고 시 애플리케이션 지표(k6)와 인프라 지표(Prometheus)를 함께 비교해 병목 지점을 판정
+- k6 기준 스크립트 경로: `loadtest/k6/ws-chat.js`
+- k6 테스트 환경변수 파일: `loadtest/.env.k6` (샘플: `loadtest/.env.k6.example`)
+- 표준 실행 방식: `k6 run loadtest/k6/ws-chat.js`
 
 ## 3) 환경 제약 (AWS 프리티어, 변경 이전 기준 반영)
 - 기준 인스턴스: `t2.micro` 또는 `t3.micro` (vCPU 1, Memory 1GiB)
@@ -72,6 +75,9 @@ docker compose -f docker-compose.yaml -f docker-compose.free-tier.yaml up -d
   - Warm-up 1분: 2~5 user/s
   - Ramp-up 3분: 5 -> 30 user/s
   - Sustain 5분: 30 user/s
+- 구현 기준:
+  - Socket.IO 네임스페이스 `/chat`
+  - 이벤트 순서 `authenticated -> join_room -> message -> received_message -> disconnect`
 
 ### 시나리오 B: 장기 접속 + 간헐 메시지
 - 목적: 연결 유지 비용(메모리/FD) 측정

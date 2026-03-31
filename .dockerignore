@@ -1,10 +1,22 @@
 .git
+.github
 .turbo
 node_modules
 apps/*/node_modules
 packages/*/node_modules
 apps/*/dist
 packages/*/dist
+apps/*/.next
+apps/*/coverage
+**/*.log
+docs
+infra
+loadtest
+CLAUDE.md
 .env
 .DS_Store
 *.log
+
+# Backend image build does not need frontend source/assets.
+apps/frontend/*
+!apps/frontend/package.json

@@ -1,0 +1,133 @@
+name: homerunnie-loadtest
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: homerunnie-backend
+    ports:
+      - "3030:3030"
+    environment:
+      DB_HOST: jikgwan-postgres
+      DATABASE_URL: postgresql://postgres:1234@jikgwan-postgres:5432/jikgwan
+    env_file:
+      - ./apps/backend/secret/.env
+    depends_on:
+      - postgres
+    cpus: "0.50"
+    mem_limit: 512m
+    mem_reservation: 384m
+    pids_limit: 256
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: jikgwan-postgres
+    environment:
+      POSTGRES_DB: jikgwan
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "1234"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    cpus: "0.30"
+    mem_limit: 384m
+    mem_reservation: 256m
+    pids_limit: 128
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: homerunnie-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=2d"
+    volumes:
+      - ./infra/loadtest/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - node-exporter
+      - postgres-exporter
+    cpus: "0.15"
+    mem_limit: 192m
+    mem_reservation: 128m
+    pids_limit: 128
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  grafana:
+    image: grafana/grafana-oss:11.1.0
+    container_name: homerunnie-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/loadtest/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    cpus: "0.10"
+    mem_limit: 192m
+    mem_reservation: 128m
+    pids_limit: 128
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: homerunnie-node-exporter
+    volumes:
+      - /:/host:ro
+    ports:
+      - "9100:9100"
+    cpus: "0.05"
+    mem_limit: 64m
+    mem_reservation: 32m
+    pids_limit: 64
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: homerunnie-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: postgresql://postgres:1234@jikgwan-postgres:5432/jikgwan?sslmode=disable
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+    cpus: "0.05"
+    mem_limit: 64m
+    mem_reservation: 32m
+    pids_limit: 64
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  loadtest-net:
+    driver: bridge
