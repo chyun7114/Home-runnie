@@ -1,5 +1,6 @@
 ﻿import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Test } from '@nestjs/testing';
 import { io, Socket } from 'socket.io-client';
@@ -103,6 +104,10 @@ describe('Chat v2 실패 메트릭 E2E', () => {
         ChatV2GatewayAdapter,
         { provide: MESSAGE_BUS_PORT, useValue: messageBusMock },
         { provide: EVENT_PUBLISHER_PORT, useValue: eventPublisherMock },
+        {
+          provide: JwtService,
+          useValue: { verifyAsync: jest.fn().mockResolvedValue({ memberId: 1 }) },
+        },
         {
           provide: ConfigService,
           useValue: {
@@ -234,6 +239,10 @@ describe('Chat v2 실패 메트릭 E2E', () => {
         ChatV2GatewayAdapter,
         { provide: MESSAGE_BUS_PORT, useValue: messageBusMock },
         { provide: EVENT_PUBLISHER_PORT, useValue: eventPublisherMock },
+        {
+          provide: JwtService,
+          useValue: { verifyAsync: jest.fn().mockResolvedValue({ memberId: 1 }) },
+        },
         {
           provide: ConfigService,
           useValue: {

@@ -142,3 +142,8 @@
   - 저장 유스케이스 연결: `chat.v2.message.received` 소비 후 DB 저장
   - 멱등성 적용: messageId 기반 dedup 포트(외부=Redis, 내부=InMemory)
   - TDD 적용: persistence/consumer/dlq-reprocessor/factory 단위 테스트 추가
+- S8 착수 (권한/유효성 강화)
+  - `CHAT_V2_REQUIRE_AUTH` 플래그 도입(기본 false)
+  - 인증 필수 모드에서 미인증 연결 `v2_not_authorized` 처리
+  - `v2_message` payload 유효성 검증 실패 시 `invalid_payload` 거절
+  - 인증 필수 모드에서 권한 없음 `unauthorized` 거절

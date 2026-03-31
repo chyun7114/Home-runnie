@@ -1,5 +1,6 @@
 ﻿import { Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
@@ -7,15 +8,17 @@ import {
   SubscribeMessage,
   WebSocketGateway,
 } from '@nestjs/websockets';
-import { Socket } from 'socket.io';
 import { randomUUID } from 'node:crypto';
-import { CHAT_WS_NAMESPACES } from '@/common/versioning/api-version.constants';
+import { Socket } from 'socket.io';
+import { JwtPayload } from '@/auth/types';
 import {
   EVENT_PUBLISHER_PORT,
   EventPublisherPort,
   MESSAGE_BUS_PORT,
   MessageBusPort,
 } from '@/chat/application/port';
+import { extractTokenFromSocket } from '@/chat/ws-jwt.guard';
+import { CHAT_WS_NAMESPACES } from '@/common/versioning/api-version.constants';
 import { MetricsService } from '@/metrics/metrics.service';
 
 @WebSocketGateway({
@@ -34,10 +37,23 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
     @Inject(MESSAGE_BUS_PORT) private readonly messageBusPort: MessageBusPort,
     @Inject(EVENT_PUBLISHER_PORT) private readonly eventPublisherPort: EventPublisherPort,
     private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
     private readonly metricsService: MetricsService,
   ) {}
 
   async handleConnection(socket: Socket) {
+    if (this.isAuthRequired()) {
+      const memberId = await this.authenticate(socket);
+      if (!memberId) {
+        socket.emit('v2_not_authorized', {
+          message: '인증이 필요합니다.',
+        });
+        socket.disconnect();
+        return;
+      }
+      socket.data.v2MemberId = memberId;
+    }
+
     const payload = {
       socketId: socket.id,
       receivedAt: new Date().toISOString(),
@@ -78,11 +94,28 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
     @MessageBody() data: { roomId: string; message: string; senderId?: number },
     @ConnectedSocket() socket: Socket,
   ) {
+    if (this.isAuthRequired() && !socket.data?.v2MemberId) {
+      socket.emit('v2_message_rejected', {
+        roomId: data.roomId,
+        accepted: false,
+        reason: 'unauthorized',
+      });
+      return;
+    }
+    if (!this.isValidPayload(data)) {
+      socket.emit('v2_message_rejected', {
+        roomId: data.roomId,
+        accepted: false,
+        reason: 'invalid_payload',
+      });
+      return;
+    }
+
     const payload = {
       messageId: randomUUID(),
       roomId: data.roomId,
-      message: data.message,
-      senderId: data.senderId,
+      message: data.message.trim(),
+      senderId: socket.data?.v2MemberId ?? data.senderId,
       socketId: socket.id,
       receivedAt: new Date().toISOString(),
     };
@@ -114,5 +147,33 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
         reason: 'broker_unavailable',
       });
     }
+  }
+
+  private isAuthRequired(): boolean {
+    return this.configService.get<string>('CHAT_V2_REQUIRE_AUTH', 'false') === 'true';
+  }
+
+  private async authenticate(socket: Socket): Promise<number | null> {
+    try {
+      const token = extractTokenFromSocket(socket);
+      if (!token) {
+        return null;
+      }
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+      });
+      return payload.memberId;
+    } catch {
+      return null;
+    }
+  }
+
+  private isValidPayload(data: { roomId: string; message: string }): boolean {
+    const roomId = Number(data.roomId);
+    if (Number.isNaN(roomId) || roomId <= 0) {
+      return false;
+    }
+    const message = data.message?.trim();
+    return typeof message === 'string' && message.length > 0 && message.length <= 1000;
   }
 }
