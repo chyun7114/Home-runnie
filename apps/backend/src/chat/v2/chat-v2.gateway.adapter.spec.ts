@@ -114,9 +114,40 @@ describe('ChatV2GatewayAdapter', () => {
         socketId: 'socket-3',
       }),
     );
+    expect((messageBusPortMock.publish as jest.Mock).mock.invocationCallOrder[0]).toBeLessThan(
+      (eventPublisherPortMock.publish as jest.Mock).mock.invocationCallOrder[0],
+    );
     expect(socket.emit).toHaveBeenCalledWith('v2_message_accepted', {
       roomId: '10',
       accepted: true,
+    });
+  });
+
+  it('v2_message 발행 실패 시 거절 응답을 보낸다', async () => {
+    const messageBusPortMock: MessageBusPort = {
+      publish: jest.fn().mockRejectedValue(new Error('redis down')),
+    };
+    const eventPublisherPortMock: EventPublisherPort = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+    const configService = createConfigService('true');
+    const gateway = new ChatV2GatewayAdapter(
+      messageBusPortMock,
+      eventPublisherPortMock,
+      configService,
+    );
+    const socket = createMockSocket('socket-4');
+
+    await gateway.handleV2Message(
+      { roomId: '20', message: 'fail-case' },
+      socket as unknown as Socket,
+    );
+
+    expect(eventPublisherPortMock.publish).not.toHaveBeenCalled();
+    expect(socket.emit).toHaveBeenCalledWith('v2_message_rejected', {
+      roomId: '20',
+      accepted: false,
+      reason: 'broker_unavailable',
     });
   });
 });

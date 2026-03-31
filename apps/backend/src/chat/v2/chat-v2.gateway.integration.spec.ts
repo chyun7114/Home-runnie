@@ -1,10 +1,10 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Test } from '@nestjs/testing';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { Test } from '@nestjs/testing';
 import { io, Socket } from 'socket.io-client';
-import { ChatV2GatewayAdapter } from '@/chat/v2/chat-v2.gateway.adapter';
 import { EVENT_PUBLISHER_PORT, MESSAGE_BUS_PORT } from '@/chat/application/port';
+import { ChatV2GatewayAdapter } from '@/chat/v2/chat-v2.gateway.adapter';
 
 type GatewayTestContext = {
   app: INestApplication;
@@ -135,6 +135,59 @@ describe('ChatV2GatewayAdapter 통합 테스트', () => {
       );
     } finally {
       await closeSocket(socket);
+      await ctx.app.close();
+    }
+  });
+
+  it('브로커 발행 실패 시 v2_message_rejected를 수신한다', async () => {
+    const ctx = await createGatewayApp('true');
+    ctx.messageBusMock.publish.mockImplementation(async (channel: string) => {
+      if (channel.startsWith('chat.v2.room.')) {
+        throw new Error('redis down');
+      }
+      return undefined;
+    });
+
+    const socketClient = io(`${ctx.baseUrl}/ws-v2`, {
+      transports: ['websocket'],
+      reconnection: false,
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('v2_ready timeout')), 3000);
+        socketClient.on('v2_ready', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      socketClient.emit('v2_message', { roomId: '11', message: 'fail-case' });
+
+      const rejected = await new Promise<{ roomId: string; accepted: boolean; reason: string }>(
+        (resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('v2_message_rejected timeout')), 3000);
+          socketClient.on(
+            'v2_message_rejected',
+            (payload: { roomId: string; accepted: boolean; reason: string }) => {
+              clearTimeout(timer);
+              resolve(payload);
+            },
+          );
+        },
+      );
+
+      expect(rejected).toEqual({
+        roomId: '11',
+        accepted: false,
+        reason: 'broker_unavailable',
+      });
+      expect(ctx.eventPublisherMock.publish).not.toHaveBeenCalledWith(
+        'chat.v2.message.received',
+        expect.objectContaining({ roomId: '11', message: 'fail-case' }),
+      );
+    } finally {
+      await closeSocket(socketClient);
       await ctx.app.close();
     }
   });

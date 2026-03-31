@@ -77,14 +77,23 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
       receivedAt: new Date().toISOString(),
     };
 
-    await Promise.all([
-      this.messageBusPort.publish(`chat.v2.room.${data.roomId}`, payload),
-      this.eventPublisherPort.publish('chat.v2.message.received', payload),
-    ]);
+    try {
+      await this.messageBusPort.publish(`chat.v2.room.${data.roomId}`, payload);
+      await this.eventPublisherPort.publish('chat.v2.message.received', payload);
 
-    socket.emit('v2_message_accepted', {
-      roomId: data.roomId,
-      accepted: true,
-    });
+      socket.emit('v2_message_accepted', {
+        roomId: data.roomId,
+        accepted: true,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `v2 메시지 브로커 발행 실패: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      socket.emit('v2_message_rejected', {
+        roomId: data.roomId,
+        accepted: false,
+        reason: 'broker_unavailable',
+      });
+    }
   }
 }
