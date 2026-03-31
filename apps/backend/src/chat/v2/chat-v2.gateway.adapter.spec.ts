@@ -104,6 +104,35 @@ describe('ChatV2GatewayAdapter', () => {
     expect(socket.disconnect).not.toHaveBeenCalled();
   });
 
+  it('인증 필수 모드에서 토큰이 없으면 연결을 거절한다', async () => {
+    const messageBusPortMock: MessageBusPort = { publish: jest.fn().mockResolvedValue(undefined) };
+    const eventPublisherPortMock: EventPublisherPort = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+    const configService = createConfigService({ useExternalBrokers: 'true', requireAuth: 'true' });
+    const jwtService = { verifyAsync: jest.fn() } as unknown as JwtService;
+    const chatRepository = createChatRepositoryMock();
+    const metricsServiceMock = createMetricsServiceMock();
+    const gateway = new ChatV2GatewayAdapter(
+      messageBusPortMock,
+      eventPublisherPortMock,
+      chatRepository,
+      configService,
+      jwtService,
+      metricsServiceMock,
+    );
+    const socket = createMockSocket('socket-auth-1');
+
+    await gateway.handleConnection(socket as unknown as Socket);
+
+    expect(socket.emit).toHaveBeenCalledWith('v2_not_authorized', {
+      message: '인증이 필요합니다.',
+    });
+    expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    expect(messageBusPortMock.publish).not.toHaveBeenCalled();
+    expect(eventPublisherPortMock.publish).not.toHaveBeenCalled();
+  });
+
   it('v2_message 수신 시 브로커 발행 후 수신 확인 응답을 반환한다', async () => {
     const messageBusPortMock: MessageBusPort = { publish: jest.fn().mockResolvedValue(undefined) };
     const eventPublisherPortMock: EventPublisherPort = {
@@ -187,6 +216,36 @@ describe('ChatV2GatewayAdapter', () => {
       accepted: false,
       reason: 'invalid_payload',
     });
+  });
+
+  it('인증 필수 모드에서 미인증 소켓의 v2_message는 unauthorized로 거절한다', async () => {
+    const messageBusPortMock: MessageBusPort = { publish: jest.fn().mockResolvedValue(undefined) };
+    const eventPublisherPortMock: EventPublisherPort = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+    const configService = createConfigService({ useExternalBrokers: 'true', requireAuth: 'true' });
+    const jwtService = { verifyAsync: jest.fn() } as unknown as JwtService;
+    const chatRepository = createChatRepositoryMock();
+    const metricsServiceMock = createMetricsServiceMock();
+    const gateway = new ChatV2GatewayAdapter(
+      messageBusPortMock,
+      eventPublisherPortMock,
+      chatRepository,
+      configService,
+      jwtService,
+      metricsServiceMock,
+    );
+    const socket = createMockSocket('socket-auth-2');
+
+    await gateway.handleV2Message({ roomId: '10', message: 'blocked' }, socket as unknown as Socket);
+
+    expect(socket.emit).toHaveBeenCalledWith('v2_message_rejected', {
+      roomId: '10',
+      accepted: false,
+      reason: 'unauthorized',
+    });
+    expect(messageBusPortMock.publish).not.toHaveBeenCalled();
+    expect(eventPublisherPortMock.publish).not.toHaveBeenCalled();
   });
 
   it('v2_recover 요청 시 gap 메시지를 반환한다', async () => {

@@ -147,6 +147,10 @@
   - 인증 필수 모드에서 미인증 연결 `v2_not_authorized` 처리
   - `v2_message` payload 유효성 검증 실패 시 `invalid_payload` 거절
   - 인증 필수 모드에서 권한 없음 `unauthorized` 거절
+  - 단위/통합/E2E 테스트 보강
+    - 단위: 미인증 `v2_message` 거절(`unauthorized`) 검증
+    - 통합: 인증 필수 모드 연결 거절(`v2_not_authorized`) 및 인증 연결 허용(`v2_ready`) 검증
+    - E2E: `chat-v2-auth.e2e-spec.ts` 추가(토큰 없음/유효 토큰 케이스)
 - S6 착수 (reconnect gap recovery)
   - `v2_recover` 이벤트 추가: `roomId`, `lastMessageId` 기반 누락 메시지 복구
   - `v2_gap_messages` 이벤트로 누락 구간 전달
@@ -156,3 +160,10 @@
   - `v2_message` payload에 서버 부여 `sequence` 추가(방 단위 단조 증가)
   - `v2_message_accepted` 응답에 `sequence` 포함
   - 단위 테스트에서 동일 room sequence 증가 검증
+- S9 진행 (브로커 backlog 지표/알람 자동화)
+  - Prometheus 알람 룰 추가: `infra/loadtest/prometheus/alerts/chat-v2-alerts.yml`
+  - backlog/거절율/p95 연계 임계치 점검 스크립트 추가: `loadtest/k6/check-backlog-alert.ps1`
+  - Prometheus 설정에 `rule_files` 연결: `infra/loadtest/prometheus/prometheus.yml`
+- S10 진행 (v2 장애 중 v1 회귀 E2E 고정)
+  - E2E 추가: `chat-v1-regression-under-v2-failure.e2e-spec.ts`
+  - 검증 포인트: v2 `broker_unavailable` 거절 발생 중에도 v1 `authenticated -> join_room -> received_message` 정상 처리

@@ -65,3 +65,13 @@ k6 run loadtest/k6/ws-chat.js
 ```bash
 docker compose -f docker-compose.loadtest.yaml down
 ```
+
+## 8) S9 backlog alert check
+
+```bash
+powershell -File loadtest/k6/check-backlog-alert.ps1 -PrometheusUrl http://localhost:9090 -Lookback 10m -OutputPath loadtest/k6/backlog-alert-summary.md
+```
+
+- Exit code `0`: OK
+- Exit code `1`: Warning
+- Exit code `2`: Critical

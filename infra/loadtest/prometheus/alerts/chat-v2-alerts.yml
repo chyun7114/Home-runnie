@@ -1,0 +1,57 @@
+groups:
+  - name: chat-v2-reliability
+    rules:
+      - alert: ChatV2BrokerBacklogWarning
+        expr: max_over_time(ws_pending_message_jobs[2m]) > 20
+        for: 2m
+        labels:
+          severity: warning
+          service: chat-v2
+        annotations:
+          summary: "Chat v2 backlog is increasing"
+          description: "ws_pending_message_jobs stayed above 20 for 2m."
+
+      - alert: ChatV2BrokerBacklogCritical
+        expr: max_over_time(ws_pending_message_jobs[1m]) > 100
+        for: 1m
+        labels:
+          severity: critical
+          service: chat-v2
+        annotations:
+          summary: "Chat v2 backlog is critical"
+          description: "ws_pending_message_jobs stayed above 100 for 1m."
+
+      - alert: ChatV2RejectedRatioHigh
+        expr: |
+          (
+            sum(rate(ws_v2_message_result_total{result="rejected"}[1m]))
+            /
+            clamp_min(sum(rate(ws_v2_message_result_total{result=~"accepted|rejected"}[1m])), 0.001)
+          ) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          service: chat-v2
+        annotations:
+          summary: "Chat v2 rejected ratio is high"
+          description: "Rejected ratio has been above 5% for 3m."
+
+      - alert: ChatV2LatencyBacklogCorrelated
+        expr: |
+          (
+            histogram_quantile(
+              0.95,
+              sum by (le) (rate(ws_message_process_duration_ms_bucket{result="ok"}[5m]))
+            ) > 2000
+          )
+          and
+          (
+            max_over_time(ws_pending_message_jobs[2m]) > 20
+          )
+        for: 2m
+        labels:
+          severity: critical
+          service: chat-v2
+        annotations:
+          summary: "Chat v2 latency degraded with backlog"
+          description: "Message p95 > 2s and pending message jobs > 20 for 2m."

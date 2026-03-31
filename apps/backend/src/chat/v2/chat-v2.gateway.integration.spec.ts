@@ -79,6 +79,61 @@ async function closeSocket(socket: Socket): Promise<void> {
 }
 
 describe('ChatV2GatewayAdapter 통합 테스트', () => {
+  it('인증 필수 모드에서 토큰 없이 연결하면 v2_not_authorized를 수신한다', async () => {
+    const ctx = await createGatewayApp({ useExternalBrokers: 'true', requireAuth: 'true' });
+    const socket = io(`${ctx.baseUrl}/ws-v2`, { transports: ['websocket'], reconnection: false });
+
+    try {
+      const payload = await new Promise<{ message: string }>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('v2_not_authorized timeout')), 3000);
+        socket.on('v2_not_authorized', (message: { message: string }) => {
+          clearTimeout(timer);
+          resolve(message);
+        });
+      });
+
+      expect(payload).toEqual({ message: '인증이 필요합니다.' });
+      expect(ctx.messageBusMock.publish).not.toHaveBeenCalled();
+      expect(ctx.eventPublisherMock.publish).not.toHaveBeenCalled();
+    } finally {
+      await closeSocket(socket);
+      await ctx.app.close();
+    }
+  });
+
+  it('인증 필수 모드에서 유효 토큰으로 연결하면 v2_ready를 수신한다', async () => {
+    const ctx = await createGatewayApp({ useExternalBrokers: 'true', requireAuth: 'true' });
+    const socket = io(`${ctx.baseUrl}/ws-v2`, {
+      transports: ['websocket'],
+      reconnection: false,
+      extraHeaders: {
+        Cookie: 'accessToken=valid-token',
+      },
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('v2_ready timeout')), 3000);
+        socket.on('v2_ready', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      expect(ctx.messageBusMock.publish).toHaveBeenCalledWith(
+        'chat.v2.connection',
+        expect.objectContaining({ socketId: expect.any(String) }),
+      );
+      expect(ctx.eventPublisherMock.publish).toHaveBeenCalledWith(
+        'chat.v2.connection.received',
+        expect.objectContaining({ socketId: expect.any(String) }),
+      );
+    } finally {
+      await closeSocket(socket);
+      await ctx.app.close();
+    }
+  });
+
   it('외부 브로커 활성화 시 v2_ready 후 v2_message_accepted를 수신한다', async () => {
     const ctx = await createGatewayApp({ useExternalBrokers: 'true' });
     const socket = io(`${ctx.baseUrl}/ws-v2`, { transports: ['websocket'], reconnection: false });
