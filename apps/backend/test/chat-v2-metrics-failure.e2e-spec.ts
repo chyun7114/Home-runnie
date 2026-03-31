@@ -10,6 +10,7 @@ import {
   EventPublisherPort,
   MessageBusPort,
 } from '@/chat/application/port';
+import { ChatRepository } from '@/chat/repository';
 import { ChatV2GatewayAdapter } from '@/chat/v2/chat-v2.gateway.adapter';
 import { MetricsModule } from '@/metrics';
 
@@ -104,6 +105,10 @@ describe('Chat v2 실패 메트릭 E2E', () => {
         ChatV2GatewayAdapter,
         { provide: MESSAGE_BUS_PORT, useValue: messageBusMock },
         { provide: EVENT_PUBLISHER_PORT, useValue: eventPublisherMock },
+        {
+          provide: ChatRepository,
+          useValue: { findMessagesAfterId: jest.fn().mockResolvedValue([]) },
+        },
         {
           provide: JwtService,
           useValue: { verifyAsync: jest.fn().mockResolvedValue({ memberId: 1 }) },
@@ -239,6 +244,10 @@ describe('Chat v2 실패 메트릭 E2E', () => {
         ChatV2GatewayAdapter,
         { provide: MESSAGE_BUS_PORT, useValue: messageBusMock },
         { provide: EVENT_PUBLISHER_PORT, useValue: eventPublisherMock },
+        {
+          provide: ChatRepository,
+          useValue: { findMessagesAfterId: jest.fn().mockResolvedValue([]) },
+        },
         {
           provide: JwtService,
           useValue: { verifyAsync: jest.fn().mockResolvedValue({ memberId: 1 }) },

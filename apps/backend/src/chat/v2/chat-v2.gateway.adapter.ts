@@ -11,6 +11,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { Socket } from 'socket.io';
 import { JwtPayload } from '@/auth/types';
+import { ChatRepository } from '@/chat/repository';
 import {
   EVENT_PUBLISHER_PORT,
   EventPublisherPort,
@@ -36,6 +37,7 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
   constructor(
     @Inject(MESSAGE_BUS_PORT) private readonly messageBusPort: MessageBusPort,
     @Inject(EVENT_PUBLISHER_PORT) private readonly eventPublisherPort: EventPublisherPort,
+    private readonly chatRepository: ChatRepository,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly metricsService: MetricsService,
@@ -147,6 +149,41 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
         reason: 'broker_unavailable',
       });
     }
+  }
+
+  @SubscribeMessage('v2_recover')
+  async handleV2Recover(
+    @MessageBody() data: { roomId: string; lastMessageId: number },
+    @ConnectedSocket() socket: Socket,
+  ) {
+    if (this.isAuthRequired() && !socket.data?.v2MemberId) {
+      socket.emit('v2_recover_failed', {
+        roomId: data.roomId,
+        reason: 'unauthorized',
+      });
+      return;
+    }
+    const roomId = Number(data.roomId);
+    const lastMessageId = Number(data.lastMessageId);
+    if (Number.isNaN(roomId) || roomId <= 0 || Number.isNaN(lastMessageId) || lastMessageId < 0) {
+      socket.emit('v2_recover_failed', {
+        roomId: data.roomId,
+        reason: 'invalid_payload',
+      });
+      return;
+    }
+
+    const gapMessages = await this.chatRepository.findMessagesAfterId(roomId, lastMessageId, 100);
+    socket.emit('v2_gap_messages', {
+      roomId: data.roomId,
+      fromMessageId: lastMessageId,
+      messages: gapMessages.map((message) => ({
+        id: message.id,
+        message: message.content,
+        senderId: message.senderId,
+        createdAt: message.createdAt,
+      })),
+    });
   }
 
   private isAuthRequired(): boolean {

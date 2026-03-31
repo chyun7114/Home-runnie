@@ -147,3 +147,8 @@
   - 인증 필수 모드에서 미인증 연결 `v2_not_authorized` 처리
   - `v2_message` payload 유효성 검증 실패 시 `invalid_payload` 거절
   - 인증 필수 모드에서 권한 없음 `unauthorized` 거절
+- S6 착수 (reconnect gap recovery)
+  - `v2_recover` 이벤트 추가: `roomId`, `lastMessageId` 기반 누락 메시지 복구
+  - `v2_gap_messages` 이벤트로 누락 구간 전달
+  - `v2_recover_failed` 이벤트로 잘못된 payload/권한 실패 응답
+  - 테스트 추가: 단위/통합에서 복구 성공·실패 케이스 검증
