@@ -94,15 +94,20 @@ describe('ChatV2GatewayAdapter 통합 테스트', () => {
 
       socket.emit('v2_message', { roomId: '10', message: 'hello' });
 
-      const ack = await new Promise<{ roomId: string; accepted: boolean }>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('v2_message_accepted timeout')), 3000);
-        socket.on('v2_message_accepted', (payload: { roomId: string; accepted: boolean }) => {
-          clearTimeout(timer);
-          resolve(payload);
-        });
-      });
+      const ack = await new Promise<{ roomId: string; accepted: boolean; sequence: number }>(
+        (resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('v2_message_accepted timeout')), 3000);
+          socket.on(
+            'v2_message_accepted',
+            (payload: { roomId: string; accepted: boolean; sequence: number }) => {
+              clearTimeout(timer);
+              resolve(payload);
+            },
+          );
+        },
+      );
 
-      expect(ack).toEqual({ roomId: '10', accepted: true });
+      expect(ack).toEqual({ roomId: '10', accepted: true, sequence: 1 });
     } finally {
       await closeSocket(socket);
       await ctx.app.close();

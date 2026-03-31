@@ -33,6 +33,7 @@ import { MetricsService } from '@/metrics/metrics.service';
 })
 export class ChatV2GatewayAdapter implements OnGatewayConnection {
   private readonly logger = new Logger(ChatV2GatewayAdapter.name);
+  private readonly roomSequences = new Map<string, number>();
 
   constructor(
     @Inject(MESSAGE_BUS_PORT) private readonly messageBusPort: MessageBusPort,
@@ -116,6 +117,7 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
     const payload = {
       messageId: randomUUID(),
       roomId: data.roomId,
+      sequence: this.nextRoomSequence(data.roomId),
       message: data.message.trim(),
       senderId: socket.data?.v2MemberId ?? data.senderId,
       socketId: socket.id,
@@ -136,6 +138,7 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
       socket.emit('v2_message_accepted', {
         roomId: data.roomId,
         accepted: true,
+        sequence: payload.sequence,
       });
     } catch (error) {
       this.metricsService.incBrokerPublish(currentBroker, 'fail', 'message');
@@ -212,5 +215,11 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
     }
     const message = data.message?.trim();
     return typeof message === 'string' && message.length > 0 && message.length <= 1000;
+  }
+
+  private nextRoomSequence(roomId: string): number {
+    const nextSequence = (this.roomSequences.get(roomId) ?? 0) + 1;
+    this.roomSequences.set(roomId, nextSequence);
+    return nextSequence;
   }
 }

@@ -128,7 +128,37 @@ describe('ChatV2GatewayAdapter', () => {
     expect(socket.emit).toHaveBeenCalledWith('v2_message_accepted', {
       roomId: '10',
       accepted: true,
+      sequence: 1,
     });
+  });
+
+  it('같은 roomId 메시지는 sequence가 단조 증가한다', async () => {
+    const messageBusPortMock: MessageBusPort = { publish: jest.fn().mockResolvedValue(undefined) };
+    const eventPublisherPortMock: EventPublisherPort = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+    const configService = createConfigService({ useExternalBrokers: 'true' });
+    const jwtService = { verifyAsync: jest.fn() } as unknown as JwtService;
+    const chatRepository = createChatRepositoryMock();
+    const metricsServiceMock = createMetricsServiceMock();
+    const gateway = new ChatV2GatewayAdapter(
+      messageBusPortMock,
+      eventPublisherPortMock,
+      chatRepository,
+      configService,
+      jwtService,
+      metricsServiceMock,
+    );
+    const socket = createMockSocket('socket-10');
+
+    await gateway.handleV2Message({ roomId: '30', message: 'm1' }, socket as unknown as Socket);
+    await gateway.handleV2Message({ roomId: '30', message: 'm2' }, socket as unknown as Socket);
+
+    const calls = (messageBusPortMock.publish as jest.Mock).mock.calls.filter((call) =>
+      String(call[0]).startsWith('chat.v2.room.30'),
+    );
+    expect(calls[0][1]).toEqual(expect.objectContaining({ sequence: 1 }));
+    expect(calls[1][1]).toEqual(expect.objectContaining({ sequence: 2 }));
   });
 
   it('payload가 유효하지 않으면 invalid_payload로 거절한다', async () => {
@@ -167,16 +197,14 @@ describe('ChatV2GatewayAdapter', () => {
     const configService = createConfigService({ useExternalBrokers: 'true' });
     const jwtService = { verifyAsync: jest.fn() } as unknown as JwtService;
     const chatRepository = {
-      findMessagesAfterId: jest
-        .fn()
-        .mockResolvedValue([
-          {
-            id: 11,
-            content: 'missed-1',
-            senderId: 2,
-            createdAt: new Date('2026-03-31T00:00:00.000Z'),
-          },
-        ]),
+      findMessagesAfterId: jest.fn().mockResolvedValue([
+        {
+          id: 11,
+          content: 'missed-1',
+          senderId: 2,
+          createdAt: new Date('2026-03-31T00:00:00.000Z'),
+        },
+      ]),
     } as unknown as ChatRepository;
     const metricsServiceMock = createMetricsServiceMock();
     const gateway = new ChatV2GatewayAdapter(

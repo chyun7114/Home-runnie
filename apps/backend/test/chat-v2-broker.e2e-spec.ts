@@ -96,13 +96,18 @@ describe('Chat v2 브로커 연동 E2E', () => {
       );
     });
 
-    const ackPromise = new Promise<{ roomId: string; accepted: boolean }>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('v2_message_accepted timeout')), 5000);
-      socket.on('v2_message_accepted', (payload: { roomId: string; accepted: boolean }) => {
-        clearTimeout(timer);
-        resolve(payload);
-      });
-    });
+    const ackPromise = new Promise<{ roomId: string; accepted: boolean; sequence: number }>(
+      (resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('v2_message_accepted timeout')), 5000);
+        socket.on(
+          'v2_message_accepted',
+          (payload: { roomId: string; accepted: boolean; sequence: number }) => {
+            clearTimeout(timer);
+            resolve(payload);
+          },
+        );
+      },
+    );
 
     socket.emit('v2_message', { roomId, message: testMessage });
 
@@ -112,7 +117,12 @@ describe('Chat v2 브로커 연동 E2E', () => {
       rabbitPayloadPromise,
     ]);
 
-    expect(ack).toEqual({ roomId, accepted: true });
+    expect(ack).toEqual(
+      expect.objectContaining({
+        roomId,
+        accepted: true,
+      }),
+    );
     expect(redisPayload).toEqual(
       expect.objectContaining({
         roomId,

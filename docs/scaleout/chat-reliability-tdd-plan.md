@@ -152,3 +152,7 @@
   - `v2_gap_messages` 이벤트로 누락 구간 전달
   - `v2_recover_failed` 이벤트로 잘못된 payload/권한 실패 응답
   - 테스트 추가: 단위/통합에서 복구 성공·실패 케이스 검증
+- S5 착수 (순서 기준점 확보)
+  - `v2_message` payload에 서버 부여 `sequence` 추가(방 단위 단조 증가)
+  - `v2_message_accepted` 응답에 `sequence` 포함
+  - 단위 테스트에서 동일 room sequence 증가 검증

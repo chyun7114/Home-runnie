@@ -121,7 +121,7 @@ describe('Chat v2 Metrics E2E', () => {
 
     const roomId = '10';
     const message = `hello-metrics-${Date.now()}`;
-    const acceptedPromise = waitForEvent<{ roomId: string; accepted: boolean }>(
+    const acceptedPromise = waitForEvent<{ roomId: string; accepted: boolean; sequence: number }>(
       socket,
       'v2_message_accepted',
       5000,
@@ -130,7 +130,12 @@ describe('Chat v2 Metrics E2E', () => {
     socket.emit('v2_message', { roomId, message });
 
     const ack = await acceptedPromise;
-    expect(ack).toEqual({ roomId, accepted: true });
+    expect(ack).toEqual(
+      expect.objectContaining({
+        roomId,
+        accepted: true,
+      }),
+    );
 
     await waitUntil(
       async () => {
