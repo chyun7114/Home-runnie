@@ -56,6 +56,14 @@ const LEAVE_DELAY_MS = Number(env('LEAVE_DELAY_MS', '1000'));
 const AUTH_TIMEOUT_MS = Number(env('AUTH_TIMEOUT_MS', '8000'));
 const JOIN_TIMEOUT_MS = Number(env('JOIN_TIMEOUT_MS', '8000'));
 const MESSAGE_TIMEOUT_MS = Number(env('MESSAGE_TIMEOUT_MS', '8000'));
+const RATE_START = Number(env('RATE_START', '2'));
+const RATE_WARMUP_TARGET = Number(env('RATE_WARMUP_TARGET', '5'));
+const RATE_TARGET = Number(env('RATE_TARGET', '30'));
+const STAGE_WARMUP = env('STAGE_WARMUP', '1m');
+const STAGE_RAMP = env('STAGE_RAMP', '3m');
+const STAGE_SUSTAIN = env('STAGE_SUSTAIN', '5m');
+const K6_PREALLOCATED_VUS = Number(env('K6_PREALLOCATED_VUS', '50'));
+const K6_MAX_VUS = Number(env('K6_MAX_VUS', '300'));
 
 const BASE_HTTP_URL = env('BACKEND_HTTP_URL', 'http://localhost:3030');
 const WS_URL = `${BASE_HTTP_URL.replace(/^http/i, 'ws')}/socket.io/?EIO=4&transport=websocket`;
@@ -90,17 +98,18 @@ function parseSocketIoEvent(message) {
 }
 
 export const options = {
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'],
   scenarios: {
     ws_join_send_leave: {
       executor: 'ramping-arrival-rate',
-      startRate: 2,
+      startRate: RATE_START,
       timeUnit: '1s',
-      preAllocatedVUs: 50,
-      maxVUs: 300,
+      preAllocatedVUs: K6_PREALLOCATED_VUS,
+      maxVUs: K6_MAX_VUS,
       stages: [
-        { target: 5, duration: '1m' },
-        { target: 30, duration: '3m' },
-        { target: 30, duration: '5m' },
+        { target: RATE_WARMUP_TARGET, duration: STAGE_WARMUP },
+        { target: RATE_TARGET, duration: STAGE_RAMP },
+        { target: RATE_TARGET, duration: STAGE_SUSTAIN },
       ],
     },
   },

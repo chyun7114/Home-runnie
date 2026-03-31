@@ -61,6 +61,7 @@ services:
     depends_on:
       - node-exporter
       - postgres-exporter
+      - cadvisor
     cpus: "0.15"
     mem_limit: 192m
     mem_reservation: 128m
@@ -118,6 +119,24 @@ services:
     cpus: "0.05"
     mem_limit: 64m
     mem_reservation: 32m
+    pids_limit: 64
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: homerunnie-cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
+    cpus: "0.05"
+    mem_limit: 96m
+    mem_reservation: 64m
     pids_limit: 64
     restart: unless-stopped
     networks:
