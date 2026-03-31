@@ -186,4 +186,57 @@ describe('ChatV2GatewayAdapter', () => {
       reason: 'broker_unavailable',
     });
   });
+
+  it('Redis 성공 후 MQ 실패 시에도 거절 응답을 반환한다', async () => {
+    const messageBusPortMock: MessageBusPort = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    };
+    const eventPublisherPortMock: EventPublisherPort = {
+      publish: jest.fn().mockRejectedValue(new Error('mq down')),
+    };
+    const configService = createConfigService('true');
+    const metricsServiceMock = createMetricsServiceMock();
+    const gateway = new ChatV2GatewayAdapter(
+      messageBusPortMock,
+      eventPublisherPortMock,
+      configService,
+      metricsServiceMock,
+    );
+    const socket = createMockSocket('socket-5');
+
+    await gateway.handleV2Message(
+      { roomId: '30', message: 'mq-fail-case' },
+      socket as unknown as Socket,
+    );
+
+    expect(messageBusPortMock.publish).toHaveBeenCalledWith(
+      'chat.v2.room.30',
+      expect.objectContaining({
+        roomId: '30',
+        message: 'mq-fail-case',
+        socketId: 'socket-5',
+      }),
+    );
+    expect(eventPublisherPortMock.publish).toHaveBeenCalledWith(
+      'chat.v2.message.received',
+      expect.objectContaining({
+        roomId: '30',
+        message: 'mq-fail-case',
+        socketId: 'socket-5',
+      }),
+    );
+    expect((metricsServiceMock.incBrokerPublish as jest.Mock).mock.calls).toEqual([
+      ['redis', 'ok', 'message'],
+      ['mq', 'fail', 'message'],
+    ]);
+    expect(metricsServiceMock.incV2MessageResult).toHaveBeenCalledWith(
+      'rejected',
+      'broker_unavailable',
+    );
+    expect(socket.emit).toHaveBeenCalledWith('v2_message_rejected', {
+      roomId: '30',
+      accepted: false,
+      reason: 'broker_unavailable',
+    });
+  });
 });

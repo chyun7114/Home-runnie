@@ -124,3 +124,15 @@
 1. S2(“Redis 성공, MQ 실패”)를 실브로커/모의 모두에서 검증
 2. MQ consumer 경로(저장/재시도/DLQ) 설계 문서 추가
 3. idempotency key 스키마 초안 작성
+
+## 10. 진행 현황 (2026-03-31)
+
+- S2 시나리오 테스트 확장 완료
+- 단위: `chat-v2.gateway.adapter.spec.ts`
+  - Redis 성공 후 MQ 실패 시 `v2_message_rejected` 검증
+  - 메트릭 `redis ok`, `mq fail`, `rejected` 호출 검증
+- 통합: `chat-v2.gateway.integration.spec.ts`
+  - Redis 성공 후 MQ 실패 소켓 응답(`v2_message_rejected`) 검증
+- E2E: `chat-v2-metrics-failure.e2e-spec.ts`
+  - Redis 실패 경로 메트릭 증가 검증 유지
+  - Redis 성공 후 MQ 실패 경로 메트릭 증가 검증 추가

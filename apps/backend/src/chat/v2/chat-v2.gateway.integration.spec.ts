@@ -199,4 +199,61 @@ describe('ChatV2GatewayAdapter 통합 테스트', () => {
       await ctx.app.close();
     }
   });
+
+  it('Redis 성공 후 MQ 실패 시 v2_message_rejected를 수신한다', async () => {
+    const ctx = await createGatewayApp('true');
+    ctx.eventPublisherMock.publish.mockImplementation(async (channel: string) => {
+      if (channel === 'chat.v2.message.received') {
+        throw new Error('mq down');
+      }
+      return undefined;
+    });
+
+    const socketClient = io(`${ctx.baseUrl}/ws-v2`, {
+      transports: ['websocket'],
+      reconnection: false,
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('v2_ready timeout')), 3000);
+        socketClient.on('v2_ready', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      socketClient.emit('v2_message', { roomId: '12', message: 'mq-fail-case' });
+
+      const rejected = await new Promise<{ roomId: string; accepted: boolean; reason: string }>(
+        (resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('v2_message_rejected timeout')), 3000);
+          socketClient.on(
+            'v2_message_rejected',
+            (payload: { roomId: string; accepted: boolean; reason: string }) => {
+              clearTimeout(timer);
+              resolve(payload);
+            },
+          );
+        },
+      );
+
+      expect(rejected).toEqual({
+        roomId: '12',
+        accepted: false,
+        reason: 'broker_unavailable',
+      });
+      expect(ctx.messageBusMock.publish).toHaveBeenCalledWith(
+        'chat.v2.room.12',
+        expect.objectContaining({ roomId: '12', message: 'mq-fail-case' }),
+      );
+      expect(ctx.eventPublisherMock.publish).toHaveBeenCalledWith(
+        'chat.v2.message.received',
+        expect.objectContaining({ roomId: '12', message: 'mq-fail-case' }),
+      );
+    } finally {
+      await closeSocket(socketClient);
+      await ctx.app.close();
+    }
+  });
 });
