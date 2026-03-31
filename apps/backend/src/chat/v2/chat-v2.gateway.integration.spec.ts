@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { io, Socket } from 'socket.io-client';
 import { EVENT_PUBLISHER_PORT, MESSAGE_BUS_PORT } from '@/chat/application/port';
 import { ChatV2GatewayAdapter } from '@/chat/v2/chat-v2.gateway.adapter';
+import { MetricsService } from '@/metrics/metrics.service';
 
 type GatewayTestContext = {
   app: INestApplication;
@@ -26,6 +27,13 @@ async function createGatewayApp(useExternalBrokers: 'true' | 'false'): Promise<G
       ChatV2GatewayAdapter,
       { provide: MESSAGE_BUS_PORT, useValue: messageBusMock },
       { provide: EVENT_PUBLISHER_PORT, useValue: eventPublisherMock },
+      {
+        provide: MetricsService,
+        useValue: {
+          incBrokerPublish: jest.fn(),
+          incV2MessageResult: jest.fn(),
+        },
+      },
       {
         provide: ConfigService,
         useValue: {

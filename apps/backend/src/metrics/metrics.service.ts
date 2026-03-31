@@ -1,12 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import {
-  collectDefaultMetrics,
-  Counter,
-  Gauge,
-  Histogram,
-  Registry,
-  type LabelValues,
-} from 'prom-client';
+import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 
 type FailureReason =
@@ -17,6 +10,12 @@ type FailureReason =
   | 'join_permission_fail'
   | 'message_timeout'
   | 'socket_disconnected_before_ack';
+
+type BrokerType = 'redis' | 'mq';
+type BrokerPublishResult = 'ok' | 'fail';
+type BrokerPublishRoute = 'connection' | 'message';
+type V2MessageResult = 'accepted' | 'rejected';
+type V2MessageReason = 'none' | 'broker_unavailable';
 
 @Injectable()
 export class MetricsService implements OnModuleDestroy {
@@ -67,6 +66,20 @@ export class MetricsService implements OnModuleDestroy {
     name: 'ws_failure_total',
     help: 'WebSocket failure count by reason',
     labelNames: ['reason'],
+    registers: [this.registry],
+  });
+
+  private readonly wsBrokerPublishCounter = new Counter({
+    name: 'ws_broker_publish_total',
+    help: 'Broker publish result count by broker and route',
+    labelNames: ['broker', 'result', 'route'],
+    registers: [this.registry],
+  });
+
+  private readonly wsV2MessageResultCounter = new Counter({
+    name: 'ws_v2_message_result_total',
+    help: 'V2 message handling result count',
+    labelNames: ['result', 'reason'],
     registers: [this.registry],
   });
 
@@ -170,6 +183,14 @@ export class MetricsService implements OnModuleDestroy {
 
   incFailure(reason: FailureReason) {
     this.wsFailureCounter.inc({ reason });
+  }
+
+  incBrokerPublish(broker: BrokerType, result: BrokerPublishResult, route: BrokerPublishRoute) {
+    this.wsBrokerPublishCounter.inc({ broker, result, route });
+  }
+
+  incV2MessageResult(result: V2MessageResult, reason: V2MessageReason = 'none') {
+    this.wsV2MessageResultCounter.inc({ result, reason });
   }
 
   incPendingMessage() {
