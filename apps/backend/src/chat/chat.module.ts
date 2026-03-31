@@ -11,6 +11,8 @@ import {
   ChatGatewayRoomEventAdapter,
   NoopEventPublisherAdapter,
   NoopMessageBusAdapter,
+  RabbitMqEventPublisherAdapter,
+  RedisMessageBusAdapter,
 } from '@/chat/adapter';
 import { DbModule } from '@/common/db/db.module';
 import { MemberModule } from '@/member/member.module';
@@ -33,8 +35,6 @@ import { EVENT_PUBLISHER_PORT, MESSAGE_BUS_PORT, ROOM_EVENT_PORT } from '@/chat/
     ChatGateway,
     ChatV2GatewayAdapter,
     ChatGatewayRoomEventAdapter,
-    NoopMessageBusAdapter,
-    NoopEventPublisherAdapter,
     WsJwtGuard,
     ChatService,
     ChatRepository,
@@ -44,11 +44,25 @@ import { EVENT_PUBLISHER_PORT, MESSAGE_BUS_PORT, ROOM_EVENT_PORT } from '@/chat/
     },
     {
       provide: MESSAGE_BUS_PORT,
-      useExisting: NoopMessageBusAdapter,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const useExternalBrokers = configService.get<string>('CHAT_USE_EXTERNAL_BROKERS', 'false');
+        if (useExternalBrokers === 'true') {
+          return new RedisMessageBusAdapter(configService);
+        }
+        return new NoopMessageBusAdapter();
+      },
     },
     {
       provide: EVENT_PUBLISHER_PORT,
-      useExisting: NoopEventPublisherAdapter,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const useExternalBrokers = configService.get<string>('CHAT_USE_EXTERNAL_BROKERS', 'false');
+        if (useExternalBrokers === 'true') {
+          return new RabbitMqEventPublisherAdapter(configService);
+        }
+        return new NoopEventPublisherAdapter();
+      },
     },
   ],
   exports: [ChatService],
