@@ -11,10 +11,17 @@ services:
     environment:
       DB_HOST: jikgwan-postgres
       DATABASE_URL: postgresql://postgres:1234@jikgwan-postgres:5432/jikgwan
+      CHAT_USE_EXTERNAL_BROKERS: "true"
+      REDIS_HOST: homerunnie-redis
+      REDIS_PORT: "6379"
+      RABBITMQ_URL: amqp://guest:guest@homerunnie-rabbitmq:5672
+      RABBITMQ_EXCHANGE: chat.events
     env_file:
       - ./apps/backend/secret/.env
     depends_on:
       - postgres
+      - redis
+      - rabbitmq
     cpus: "0.50"
     mem_limit: 512m
     mem_reservation: 384m
@@ -41,6 +48,33 @@ services:
     cpus: "0.30"
     mem_limit: 384m
     mem_reservation: 256m
+    pids_limit: 128
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: homerunnie-redis
+    ports:
+      - "6379:6379"
+    cpus: "0.10"
+    mem_limit: 128m
+    mem_reservation: 64m
+    pids_limit: 64
+    restart: unless-stopped
+    networks:
+      - loadtest-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: homerunnie-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    cpus: "0.20"
+    mem_limit: 256m
+    mem_reservation: 128m
     pids_limit: 128
     restart: unless-stopped
     networks:
