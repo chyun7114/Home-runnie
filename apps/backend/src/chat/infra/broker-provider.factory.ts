@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
-import { EventPublisherPort, MessageBusPort } from '@/chat/application/port';
+import { EventPublisherPort, MessageBusPort, MessageDedupPort } from '@/chat/application/port';
 import {
+  InMemoryMessageDedupAdapter,
   NoopEventPublisherAdapter,
   NoopMessageBusAdapter,
   RabbitMqEventPublisherAdapter,
+  RedisMessageDedupAdapter,
   RedisMessageBusAdapter,
 } from '@/chat/adapter';
 
@@ -21,6 +23,11 @@ type EventPublisherAdapterCreators = {
   createNoop: () => EventPublisherPort;
 };
 
+type MessageDedupAdapterCreators = {
+  createExternal: (configService: ConfigService) => MessageDedupPort;
+  createInMemory: () => MessageDedupPort;
+};
+
 const defaultMessageBusCreators: MessageBusAdapterCreators = {
   createExternal: (configService) => new RedisMessageBusAdapter(configService),
   createNoop: () => new NoopMessageBusAdapter(),
@@ -29,6 +36,11 @@ const defaultMessageBusCreators: MessageBusAdapterCreators = {
 const defaultEventPublisherCreators: EventPublisherAdapterCreators = {
   createExternal: (configService) => new RabbitMqEventPublisherAdapter(configService),
   createNoop: () => new NoopEventPublisherAdapter(),
+};
+
+const defaultMessageDedupCreators: MessageDedupAdapterCreators = {
+  createExternal: (configService) => new RedisMessageDedupAdapter(configService),
+  createInMemory: () => new InMemoryMessageDedupAdapter(),
 };
 
 export function createMessageBusAdapter(
@@ -49,4 +61,14 @@ export function createEventPublisherAdapter(
     return creators.createExternal(configService);
   }
   return creators.createNoop();
+}
+
+export function createMessageDedupAdapter(
+  configService: ConfigService,
+  creators: MessageDedupAdapterCreators = defaultMessageDedupCreators,
+): MessageDedupPort {
+  if (shouldUseExternalBrokers(configService)) {
+    return creators.createExternal(configService);
+  }
+  return creators.createInMemory();
 }

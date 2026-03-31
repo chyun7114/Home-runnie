@@ -1,12 +1,15 @@
-import { ConfigService } from '@nestjs/config';
+﻿import { ConfigService } from '@nestjs/config';
 import {
   createEventPublisherAdapter,
+  createMessageDedupAdapter,
   createMessageBusAdapter,
 } from '@/chat/infra/broker-provider.factory';
 import {
+  InMemoryMessageDedupAdapter,
   NoopEventPublisherAdapter,
   NoopMessageBusAdapter,
   RabbitMqEventPublisherAdapter,
+  RedisMessageDedupAdapter,
   RedisMessageBusAdapter,
 } from '@/chat/adapter';
 
@@ -65,6 +68,30 @@ describe('broker-provider.factory', () => {
     const adapter = createEventPublisherAdapter(configService, {
       createExternal: () => externalAdapter,
       createNoop: () => new NoopEventPublisherAdapter(),
+    });
+
+    expect(adapter).toBe(externalAdapter);
+  });
+
+  it('외부 브로커 비활성화면 InMemory 멱등 어댑터를 반환한다', () => {
+    const configService = createConfigService('false');
+    const inMemoryAdapter = new InMemoryMessageDedupAdapter();
+
+    const adapter = createMessageDedupAdapter(configService, {
+      createExternal: () => new RedisMessageDedupAdapter(configService),
+      createInMemory: () => inMemoryAdapter,
+    });
+
+    expect(adapter).toBe(inMemoryAdapter);
+  });
+
+  it('외부 브로커 활성화면 Redis 멱등 어댑터를 반환한다', () => {
+    const configService = createConfigService('true');
+    const externalAdapter = { reserve: jest.fn() };
+
+    const adapter = createMessageDedupAdapter(configService, {
+      createExternal: () => externalAdapter,
+      createInMemory: () => new InMemoryMessageDedupAdapter(),
     });
 
     expect(adapter).toBe(externalAdapter);

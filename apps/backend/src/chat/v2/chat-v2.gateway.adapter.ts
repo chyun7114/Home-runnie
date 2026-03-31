@@ -8,6 +8,7 @@ import {
   WebSocketGateway,
 } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
+import { randomUUID } from 'node:crypto';
 import { CHAT_WS_NAMESPACES } from '@/common/versioning/api-version.constants';
 import {
   EVENT_PUBLISHER_PORT,
@@ -74,12 +75,14 @@ export class ChatV2GatewayAdapter implements OnGatewayConnection {
 
   @SubscribeMessage('v2_message')
   async handleV2Message(
-    @MessageBody() data: { roomId: string; message: string },
+    @MessageBody() data: { roomId: string; message: string; senderId?: number },
     @ConnectedSocket() socket: Socket,
   ) {
     const payload = {
+      messageId: randomUUID(),
       roomId: data.roomId,
       message: data.message,
+      senderId: data.senderId,
       socketId: socket.id,
       receivedAt: new Date().toISOString(),
     };

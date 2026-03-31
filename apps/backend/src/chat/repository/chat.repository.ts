@@ -236,6 +236,16 @@ export class ChatRepository {
     return members;
   }
 
+  async findAnyMemberIdByChatRoom(chatRoomId: number): Promise<number | null> {
+    const [member] = await this.db
+      .select({ memberId: ChatRoomMember.memberId })
+      .from(ChatRoomMember)
+      .where(and(eq(ChatRoomMember.chatRoomId, chatRoomId), eq(ChatRoomMember.deleted, false)))
+      .limit(1);
+
+    return member?.memberId ?? null;
+  }
+
   async softDeleteChatRoomMember(chatRoomId: number, memberId: number) {
     const [updated] = await this.db
       .update(ChatRoomMember)
