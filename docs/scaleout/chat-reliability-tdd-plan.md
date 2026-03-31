@@ -138,6 +138,7 @@
   - Redis 성공 후 MQ 실패 경로 메트릭 증가 검증 추가
 - S3 1~4단계 구현 완료
   - MQ consumer 추가: 재시도/한도 초과 시 DLQ 이동
+  - DLQ 재처리 워커 추가: 한도 내 재투입, 초과 시 parking 이동
   - 저장 유스케이스 연결: `chat.v2.message.received` 소비 후 DB 저장
   - 멱등성 적용: messageId 기반 dedup 포트(외부=Redis, 내부=InMemory)
-  - TDD 적용: persistence/consumer/factory 단위 테스트 추가
+  - TDD 적용: persistence/consumer/dlq-reprocessor/factory 단위 테스트 추가

@@ -21,7 +21,11 @@ import {
   createMessageDedupAdapter,
   createMessageBusAdapter,
 } from '@/chat/infra/broker-provider.factory';
-import { ChatV2MessageConsumerAdapter, ChatV2MessagePersistenceService } from '@/chat/v2';
+import {
+  ChatV2MessageConsumerAdapter,
+  ChatV2MessageDlqReprocessorAdapter,
+  ChatV2MessagePersistenceService,
+} from '@/chat/v2';
 
 @Module({
   imports: [
@@ -40,6 +44,7 @@ import { ChatV2MessageConsumerAdapter, ChatV2MessagePersistenceService } from '@
     ChatGateway,
     ChatV2GatewayAdapter,
     ChatV2MessageConsumerAdapter,
+    ChatV2MessageDlqReprocessorAdapter,
     ChatV2MessagePersistenceService,
     ChatGatewayRoomEventAdapter,
     WsJwtGuard,

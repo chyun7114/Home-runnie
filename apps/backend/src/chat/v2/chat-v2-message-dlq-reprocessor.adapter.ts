@@ -1,8 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { connect } from 'amqplib';
-import { ChatV2MessagePersistenceService } from '@/chat/v2/chat-v2-message-persistence.service';
-import { ChatV2MessageReceivedEvent } from '@/chat/v2/chat-v2-message-event';
 
 type MessageLike = {
   content: Buffer;
@@ -42,8 +40,8 @@ type ConnectionLike = {
 type ConnectFn = (url: string) => Promise<ConnectionLike>;
 
 @Injectable()
-export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(ChatV2MessageConsumerAdapter.name);
+export class ChatV2MessageDlqReprocessorAdapter implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ChatV2MessageDlqReprocessorAdapter.name);
   private readonly useExternalBrokers: boolean;
   private readonly amqpUrl: string;
   private readonly exchange: string;
@@ -51,17 +49,14 @@ export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestr
   private readonly queueName: string;
   private readonly routingKey: string;
   private readonly dlqRoutingKey: string;
-  private readonly maxRetries: number;
+  private readonly parkingRoutingKey: string;
+  private readonly maxDlqRetries: number;
   private readonly connectFn: ConnectFn;
 
   private connection: ConnectionLike | null = null;
   private channel: ChannelLike | null = null;
 
-  constructor(
-    configService: ConfigService,
-    private readonly persistenceService: ChatV2MessagePersistenceService,
-    connectFn?: ConnectFn,
-  ) {
+  constructor(configService: ConfigService, connectFn?: ConnectFn) {
     this.useExternalBrokers =
       configService.get<string>('CHAT_USE_EXTERNAL_BROKERS', 'false') === 'true';
     this.amqpUrl = configService.get<string>('RABBITMQ_URL', 'amqp://localhost:5672');
@@ -73,7 +68,10 @@ export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestr
     );
     this.routingKey = 'chat.v2.message.received';
     this.dlqRoutingKey = `${this.routingKey}.dlq`;
-    this.maxRetries = Number(configService.get<string>('RABBITMQ_V2_CONSUMER_MAX_RETRIES', '3'));
+    this.parkingRoutingKey = `${this.routingKey}.parking`;
+    this.maxDlqRetries = Number(
+      configService.get<string>('RABBITMQ_V2_DLQ_REPROCESS_MAX_RETRIES', '2'),
+    );
     this.connectFn = connectFn ?? ((url: string) => connect(url) as Promise<ConnectionLike>);
   }
 
@@ -87,64 +85,81 @@ export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestr
 
     await this.channel.assertExchange(this.exchange, 'topic', { durable: true });
     await this.channel.assertExchange(this.dlxExchange, 'topic', { durable: true });
-    await this.channel.assertQueue(this.queueName, { durable: true });
     await this.channel.assertQueue(`${this.queueName}.dlq`, { durable: true });
-    await this.channel.bindQueue(this.queueName, this.exchange, this.routingKey);
+    await this.channel.assertQueue(`${this.queueName}.parking`, { durable: true });
     await this.channel.bindQueue(`${this.queueName}.dlq`, this.dlxExchange, this.dlqRoutingKey);
+    await this.channel.bindQueue(
+      `${this.queueName}.parking`,
+      this.dlxExchange,
+      this.parkingRoutingKey,
+    );
 
-    await this.channel.consume(this.queueName, (message) => this.handleMessage(message), {
-      noAck: false,
-    });
+    await this.channel.consume(
+      `${this.queueName}.dlq`,
+      (message) => this.handleDlqMessage(message),
+      {
+        noAck: false,
+      },
+    );
   }
 
-  private async handleMessage(message: MessageLike | null): Promise<void> {
+  private async handleDlqMessage(message: MessageLike | null): Promise<void> {
     if (!message || !this.channel) {
       return;
     }
 
-    let payload: ChatV2MessageReceivedEvent | null = null;
     try {
-      payload = JSON.parse(message.content.toString('utf8')) as ChatV2MessageReceivedEvent;
-      await this.persistenceService.persist(payload);
-      this.channel.ack(message);
-    } catch (error) {
-      const retryCount = this.getRetryCount(message);
+      const dlqRetryCount = this.getDlqRetryCount(message);
+      if (dlqRetryCount < this.maxDlqRetries) {
+        const replayPayload = this.extractReplayPayload(message.content);
 
-      if (retryCount < this.maxRetries) {
-        this.channel.publish(this.exchange, this.routingKey, message.content, {
-          persistent: true,
-          contentType: 'application/json',
-          headers: { 'x-retry-count': retryCount + 1 },
-        });
-      } else {
-        const failedPayload = Buffer.from(
-          JSON.stringify({
-            failedAt: new Date().toISOString(),
-            reason: error instanceof Error ? error.message : 'unknown error',
-            retryCount,
-            originalPayload: payload ?? message.content.toString('utf8'),
-          }),
-        );
-
-        this.channel.publish(this.dlxExchange, this.dlqRoutingKey, failedPayload, {
+        this.channel.publish(this.exchange, this.routingKey, replayPayload, {
           persistent: true,
           contentType: 'application/json',
           headers: {
-            'x-dlq-retry-count': message.properties.headers?.['x-dlq-retry-count'] ?? 0,
+            'x-retry-count': 0,
+            'x-dlq-retry-count': dlqRetryCount + 1,
+          },
+        });
+      } else {
+        this.channel.publish(this.dlxExchange, this.parkingRoutingKey, message.content, {
+          persistent: true,
+          contentType: 'application/json',
+          headers: {
+            'x-dlq-retry-count': dlqRetryCount,
           },
         });
 
-        this.logger.warn(
-          `v2 message DLQ 이동: ${error instanceof Error ? error.message : 'unknown error'}`,
-        );
+        this.logger.warn(`v2 DLQ 재처리 한도 초과로 parking 이동: retry=${dlqRetryCount}`);
       }
-
+    } catch (error) {
+      this.logger.warn(
+        `v2 DLQ 재처리 실패: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      this.channel.publish(this.dlxExchange, this.parkingRoutingKey, message.content, {
+        persistent: true,
+        contentType: 'application/json',
+        headers: {
+          'x-dlq-retry-count': this.getDlqRetryCount(message),
+        },
+      });
+    } finally {
       this.channel.ack(message);
     }
   }
 
-  private getRetryCount(message: MessageLike): number {
-    const retryCount = message.properties.headers?.['x-retry-count'];
+  private extractReplayPayload(content: Buffer): Buffer {
+    const parsed = JSON.parse(content.toString('utf8')) as {
+      originalPayload?: unknown;
+    };
+    const replay = parsed?.originalPayload ?? parsed;
+    const normalized =
+      typeof replay === 'string' ? (JSON.parse(replay) as Record<string, unknown>) : replay;
+    return Buffer.from(JSON.stringify(normalized));
+  }
+
+  private getDlqRetryCount(message: MessageLike): number {
+    const retryCount = message.properties.headers?.['x-dlq-retry-count'];
     return typeof retryCount === 'number' ? retryCount : 0;
   }
 
@@ -158,7 +173,7 @@ export class ChatV2MessageConsumerAdapter implements OnModuleInit, OnModuleDestr
       }
     } catch (error) {
       this.logger.warn(
-        `consumer resource close 실패: ${error instanceof Error ? error.message : 'unknown error'}`,
+        `dlq reprocessor close 실패: ${error instanceof Error ? error.message : 'unknown error'}`,
       );
     } finally {
       this.channel = null;
