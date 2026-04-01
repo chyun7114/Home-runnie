@@ -1,5 +1,24 @@
 # Scale-out 이전 WebSocket 부하테스트 결과 정리
 
+## 목차
+
+- 1. 목적
+- 2. 테스트 구성
+- 3. 측정 지표
+- 4. Capacity Matrix 결과
+- 5. 핵심 해석
+  - 5.1 구간별 해석
+  - 5.2 sla8 vs diag15 해석
+  - 5.3 ws_auth 관련 결론
+  - 5.4 dropped_iterations / max_active_vus 해석
+- 6. 지표 해석 시 주의사항
+- 7. 서버 계측 추가 현황 (Prometheus)
+  - 7.1 타이머/히스토그램
+  - 7.2 실패 카운터
+  - 7.3 게이지
+- 8. 최종 결론 (Scale-out 이전 기준선)
+- 9. 다음 단계 (Scale-out 검증)
+
 ## 1. 목적
 
 - 단일 인스턴스에서 WebSocket 채팅(`입장 -> 메시지 -> 퇴장`)의 처리 한계를 정량화한다.
