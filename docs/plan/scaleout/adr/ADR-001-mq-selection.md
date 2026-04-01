@@ -1,9 +1,8 @@
 # ADR-001: Scale-out 환경 MQ 선택
 
-- 상태: Accepted
 - 날짜: 2026-03-31
-- 작성자: Backend Team
-- 관련 문서: `docs/scaleout/websocket-scaleout-plan.md`
+- 작성자: 윤창현
+- 관련 문서: `docs/plan/scaleout/websocket-scaleout-plan.md`
 
 ## 1. 배경
 

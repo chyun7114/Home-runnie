@@ -2,6 +2,21 @@
 
 야구 직관 메이트 매칭 플랫폼
 
+### WebSocket 채팅 Scale-out 부하 테스트
+
+실시간 채팅 서버의 단일 인스턴스 한계를 기준선으로 측정하고,  
+scale-out 적용 후 capacity line이 실제로 얼마나 이동하는지 검증했습니다.
+
+- 단일 인스턴스의 붕괴 시작선: `20 iters/s` 부근
+- scale-out 후 붕괴 구간: `25~30 iters/s`로 지연
+- `sla8@30` 기준 `max_active_vus 287 -> 101`
+- `diag15@30` 기준 `p95 3803ms -> 1804ms`
+- 성공률 100%만으로는 안정성을 판단할 수 없고, tail latency와 dropped_iterations를 함께 봐야 함을 확인
+
+**자세한 실험 설계와 결과 해석은**
+
+- [WebSocket 부하 테스트 상세 리포트](./docs/report/performance/final-loadtest-report.md)에서 확인할 수 있습니다.
+
 ## 📋 목차
 
 - [기술 스택](#기술-스택)

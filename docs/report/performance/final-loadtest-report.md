@@ -1,10 +1,15 @@
-﻿# WebSocket 채팅 부하 테스트 포트폴리오 리포트
+﻿# WebSocket 채팅 부하 테스트 리포트
 
 ## 핵심 결과
 
 1. 단일 인스턴스에서 `20 iters/s` 부근부터 시작되던 붕괴 구간을, Scale-out 후 `25~30 iters/s` 구간으로 지연시켰다.
 2. `sla8@30`에서 `max_active_vus`는 `287 -> 101`로 감소했고, 실패형 붕괴가 지연형 포화로 완화됐다.
 3. `diag15@30` p95는 `3803ms -> 1804ms`로 개선됐지만, 성공률 100%만으로는 UX 품질을 보장할 수 없음을 확인했다.
+
+자세한 상황별 실험결과는 아래 두 링크에서 확인 가능합니다.
+
+- [단일 인스턴스 부하 테스트 리포트](test-result.md)
+- [scale-out 이후 부하 테스트 리포트](test-result-scaleout.md)
 
 ## 1. 문제 정의
 
@@ -30,7 +35,6 @@
 - 비교 문서:
   - 단일 baseline: `loadtest/k6/test-result.md`
   - scale-out: `loadtest/k6/test-result-scaleout.md`
-- 테스트 일자: 2026-03-31
 
 ## 4. 왜 `sla8`와 `diag15`를 함께 썼는가
 

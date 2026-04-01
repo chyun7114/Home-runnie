@@ -145,10 +145,6 @@
 3. timeout 영향(`sla8` vs `diag15`) 분리 해석
 4. 병목 원인 최종 결론(join/message/DB/Redis/MQ)
 
-산출물:
-
-- `loadtest/k6/test-result-scaleout.md`
-
 ## 5. 성공 판정 기준
 
 - v1 API 무변경 보장(회귀 테스트 통과)
